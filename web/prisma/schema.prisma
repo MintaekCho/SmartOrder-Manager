@@ -1,0 +1,321 @@
+// Prisma Schema for Coupang Automation System
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// 사용자 관련
+// ============================================
+
+model User {
+  id             String    @id @default(cuid())
+  email          String    @unique
+  name           String
+  passwordHash   String
+  telegramChatId String?
+
+  // 설정 (JSON)
+  settings       Json      @default("{}")
+
+  // 관계
+  products       Product[]
+  orders         Order[]
+
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@map("users")
+}
+
+// ============================================
+// 도매처 관련
+// ============================================
+
+model Supplier {
+  id          String    @id @default(cuid())
+  name        String
+  code        String    @unique
+  baseUrl     String
+
+  // 인증 정보 (암호화 저장)
+  credentials Json?
+
+  isActive    Boolean   @default(true)
+
+  // 관계
+  products    Product[]
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("suppliers")
+}
+
+// ============================================
+// 카테고리
+// ============================================
+
+model Category {
+  id           String     @id @default(cuid())
+  name         String
+  coupangId    String?
+
+  // 계층 구조
+  parentId     String?
+  parent       Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children     Category[] @relation("CategoryHierarchy")
+
+  // 관계
+  products     Product[]
+
+  @@map("categories")
+}
+
+// ============================================
+// 상품
+// ============================================
+
+model Product {
+  id                   String    @id @default(cuid())
+
+  // 관계 ID
+  userId               String
+  user                 User      @relation(fields: [userId], references: [id])
+
+  supplierId           String
+  supplier             Supplier  @relation(fields: [supplierId], references: [id])
+
+  categoryId           String?
+  category             Category? @relation(fields: [categoryId], references: [id])
+
+  // 도매처 정보
+  supplierProductId    String
+  supplierProductUrl   String?
+
+  // 쿠팡 정보
+  coupangProductId     String?
+  coupangVendorItemId  String?
+  coupangProductUrl    String?
+
+  // 상품 정보
+  name                 String
+  description          String?   @db.Text
+
+  // 이미지 (URL 배열)
+  images               Json      @default("[]")
+
+  // 옵션 (색상, 사이즈 등)
+  options              Json      @default("[]")
+
+  // 가격
+  supplierPrice        Int
+  sellingPrice         Int
+  shippingFee          Int       @default(0)
+
+  // 계산된 값
+  margin               Float
+  estimatedProfit      Int
+
+  // 상태
+  status               ProductStatus @default(DRAFT)
+
+  // 메타데이터
+  lastSyncedAt         DateTime?
+
+  // 관계
+  priceHistory         PriceHistory[]
+  orders               Order[]
+  stats                ProductStats[]
+
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@unique([supplierId, supplierProductId])
+  @@index([userId])
+  @@index([status])
+  @@map("products")
+}
+
+enum ProductStatus {
+  DRAFT
+  PENDING
+  REGISTERED
+  ACTIVE
+  PAUSED
+  OUT_OF_STOCK
+  DISCONTINUED
+}
+
+// ============================================
+// 가격 히스토리
+// ============================================
+
+model PriceHistory {
+  id              String   @id @default(cuid())
+
+  productId       String
+  product         Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  supplierPrice   Int
+  sellingPrice    Int
+  competitorPrice Int?
+
+  recordedAt      DateTime @default(now())
+
+  @@index([productId, recordedAt])
+  @@map("price_history")
+}
+
+// ============================================
+// 주문
+// ============================================
+
+model Order {
+  id               String      @id @default(cuid())
+
+  // 관계
+  productId        String
+  product          Product     @relation(fields: [productId], references: [id])
+
+  userId           String
+  user             User        @relation(fields: [userId], references: [id])
+
+  // 쿠팡 주문 정보
+  coupangOrderId   String      @unique
+  coupangOrderItemId String?
+
+  // 주문 내용
+  quantity         Int
+  unitPrice        Int
+  totalAmount      Int
+
+  // 구매자 정보
+  buyerName        String
+  buyerPhone       String
+  shippingAddress  String
+  shippingMemo     String?
+
+  // 상태
+  status           OrderStatus @default(NEW)
+
+  // 도매처 발주 정보
+  supplierOrderId  String?
+  supplierOrderedAt DateTime?
+
+  // 배송 정보
+  trackingCompany  String?
+  trackingNumber   String?
+
+  // 타임스탬프
+  orderedAt        DateTime
+  shippedAt        DateTime?
+  deliveredAt      DateTime?
+
+  // 관계
+  history          OrderHistory[]
+
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  @@index([userId, orderedAt])
+  @@index([status])
+  @@map("orders")
+}
+
+enum OrderStatus {
+  NEW
+  PENDING_ORDER
+  ORDERED
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  RETURNED
+}
+
+// ============================================
+// 주문 히스토리
+// ============================================
+
+model OrderHistory {
+  id        String      @id @default(cuid())
+
+  orderId   String
+  order     Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  status    OrderStatus
+  note      String?
+
+  createdAt DateTime    @default(now())
+
+  @@index([orderId])
+  @@map("order_history")
+}
+
+// ============================================
+// 상품 통계
+// ============================================
+
+model ProductStats {
+  id        String   @id @default(cuid())
+
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  date      DateTime @db.Date
+
+  views     Int      @default(0)
+  clicks    Int      @default(0)
+  sales     Int      @default(0)
+  revenue   Int      @default(0)
+  profit    Int      @default(0)
+
+  @@unique([productId, date])
+  @@index([date])
+  @@map("product_stats")
+}
+
+// ============================================
+// 시스템 설정
+// ============================================
+
+model SystemSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     Json
+
+  updatedAt DateTime @updatedAt
+
+  @@map("system_settings")
+}
+
+// ============================================
+// 작업 로그
+// ============================================
+
+model JobLog {
+  id        String   @id @default(cuid())
+
+  jobType   String
+  status    JobStatus
+
+  startedAt DateTime
+  endedAt   DateTime?
+
+  result    Json?
+  error     String?
+
+  @@index([jobType, startedAt])
+  @@map("job_logs")
+}
+
+enum JobStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+}
