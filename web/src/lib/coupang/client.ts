@@ -1,0 +1,687 @@
+import crypto from 'crypto';
+
+// 쿠팡 Wing API 클라이언트
+// 공식 문서: https://developers.coupang.com/
+
+const COUPANG_API_URL = 'https://api-gateway.coupang.com';
+
+interface CoupangConfig {
+  accessKey: string;
+  secretKey: string;
+}
+
+interface RequestOptions {
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  path: string;
+  query?: Record<string, string | number | boolean>;
+  body?: object;
+}
+
+// HMAC-SHA256 서명 생성
+function generateSignature(
+  method: string,
+  path: string,
+  query: string,
+  datetime: string,
+  secretKey: string
+): string {
+  // 메시지 구성: datetime + method + path + query (query는 ? 없이)
+  const message = datetime + method + path + query;
+  const signature = crypto
+    .createHmac('sha256', secretKey)
+    .update(message)
+    .digest('hex');
+  return signature;
+}
+
+// Authorization 헤더 생성
+function generateAuthorization(
+  accessKey: string,
+  signature: string,
+  datetime: string
+): string {
+  return `CEA algorithm=HmacSHA256, access-key=${accessKey}, signed-date=${datetime}, signature=${signature}`;
+}
+
+// 쿠팡 API 날짜 형식 생성 (yymmddTHHMMSSZ - GMT+0)
+function getFormattedDatetime(): string {
+  const now = new Date();
+  const year = String(now.getUTCFullYear()).slice(-2); // 2자리 연도
+  const month = String(now.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(now.getUTCDate()).padStart(2, '0');
+  const hours = String(now.getUTCHours()).padStart(2, '0');
+  const minutes = String(now.getUTCMinutes()).padStart(2, '0');
+  const seconds = String(now.getUTCSeconds()).padStart(2, '0');
+  return `${year}${month}${day}T${hours}${minutes}${seconds}Z`;
+}
+
+// 쿼리 스트링 생성 (? 없이 반환)
+function buildQueryString(params?: Record<string, string | number | boolean>): string {
+  if (!params || Object.keys(params).length === 0) return '';
+
+  const queryString = Object.entries(params)
+    .filter(([, value]) => value !== undefined && value !== null && value !== '')
+    .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
+    .join('&');
+
+  return queryString;
+}
+
+export class CoupangClient {
+  private accessKey: string;
+  private secretKey: string;
+
+  constructor(config?: CoupangConfig) {
+    this.accessKey = config?.accessKey || process.env.COUPANG_ACCESS_KEY || '';
+    this.secretKey = config?.secretKey || process.env.COUPANG_SECRET_KEY || '';
+
+    if (!this.accessKey || !this.secretKey) {
+      console.warn('Coupang API credentials not configured');
+    }
+  }
+
+  // API 요청 실행
+  async request<T>(options: RequestOptions): Promise<T> {
+    const { method, path, query, body } = options;
+
+    const queryString = buildQueryString(query);
+    const datetime = getFormattedDatetime();
+
+    // 서명 생성: GET 요청은 query 포함, POST/PUT은 query 없이
+    const signature = generateSignature(method, path, queryString, datetime, this.secretKey);
+    const authorization = generateAuthorization(this.accessKey, signature, datetime);
+
+    // URL 구성: query가 있으면 ?를 붙여서 연결
+    const fullUrl = queryString
+      ? `${COUPANG_API_URL}${path}?${queryString}`
+      : `${COUPANG_API_URL}${path}`;
+
+    const headers: Record<string, string> = {
+      'Authorization': authorization,
+      'Content-Type': 'application/json;charset=UTF-8',
+      'X-Requested-By': this.accessKey,
+    };
+
+    const fetchOptions: RequestInit = {
+      method,
+      headers,
+    };
+
+    if (body && (method === 'POST' || method === 'PUT')) {
+      fetchOptions.body = JSON.stringify(body);
+    }
+
+    console.log(`[Coupang API] ${method} ${fullUrl}`);
+    console.log(`[Coupang API] datetime: ${datetime}, path: ${path}, query: ${queryString}`);
+
+    const response = await fetch(fullUrl, fetchOptions);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[Coupang API Error] ${response.status}: ${errorText}`);
+      throw new Error(`Coupang API Error: ${response.status} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    return data as T;
+  }
+
+  // ==================== 주문 관련 API ====================
+
+  // 주문 목록 조회
+  async getOrders(params: {
+    vendorId: string;
+    createdAtFrom?: string; // yyyy-MM-dd
+    createdAtTo?: string;
+    status?: string; // ACCEPT, INSTRUCT, DEPARTURE, DELIVERING, FINAL_DELIVERY
+    maxPerPage?: number;
+    nextToken?: string;
+  }) {
+    return this.request<CoupangOrderListResponse>({
+      method: 'GET',
+      path: `/v2/providers/openapi/apis/api/v4/vendors/${params.vendorId}/ordersheets`,
+      query: {
+        createdAtFrom: params.createdAtFrom || this.getDefaultDateFrom(),
+        createdAtTo: params.createdAtTo || this.getDefaultDateTo(),
+        status: params.status || 'ACCEPT',
+        maxPerPage: params.maxPerPage || 50,
+        ...(params.nextToken && { nextToken: params.nextToken }),
+      },
+    });
+  }
+
+  // 주문 상세 조회
+  async getOrderDetail(vendorId: string, shipmentBoxId: number) {
+    return this.request<CoupangOrderDetailResponse>({
+      method: 'GET',
+      path: `/v2/providers/openapi/apis/api/v4/vendors/${vendorId}/ordersheets/${shipmentBoxId}`,
+    });
+  }
+
+  // ==================== 배송 관련 API ====================
+
+  // 발송 처리 (송장 등록)
+  async shipOrder(vendorId: string, data: ShipOrderRequest) {
+    return this.request<CoupangBaseResponse>({
+      method: 'PUT',
+      path: `/v2/providers/openapi/apis/api/v4/vendors/${vendorId}/ordersheets/invoices`,
+      body: data,
+    });
+  }
+
+  // 배송 상태 업데이트
+  async updateDeliveryStatus(vendorId: string, shipmentBoxId: number, status: string) {
+    return this.request<CoupangBaseResponse>({
+      method: 'PUT',
+      path: `/v2/providers/openapi/apis/api/v4/vendors/${vendorId}/ordersheets/${shipmentBoxId}/status/${status}`,
+    });
+  }
+
+  // ==================== 상품 관련 API ====================
+
+  // 상품 등록
+  async createProduct(vendorId: string, product: CreateProductRequest) {
+    return this.request<CoupangProductResponse>({
+      method: 'POST',
+      path: `/v2/providers/seller_api/apis/api/v1/vendors/${vendorId}/products`,
+      body: product,
+    });
+  }
+
+  // 상품 상세 조회 (seller-products API에서 sellerProductId로 필터링)
+  async getProduct(vendorId: string, sellerProductId: number) {
+    return this.request<CoupangProductDetailResponse>({
+      method: 'GET',
+      path: `/v2/providers/seller_api/apis/api/v1/marketplace/seller-products`,
+      query: {
+        vendorId,
+        sellerProductId,
+      },
+    });
+  }
+
+  // 상품 목록 페이징 조회
+  async getProducts(params: {
+    vendorId: string;
+    nextToken?: string;
+    maxPerPage?: number;
+    sellerProductId?: number;
+    status?: string;
+  }) {
+    return this.request<CoupangProductListResponse>({
+      method: 'GET',
+      path: `/v2/providers/seller_api/apis/api/v1/marketplace/seller-products`,
+      query: {
+        vendorId: params.vendorId,
+        maxPerPage: params.maxPerPage || 50,
+        ...(params.nextToken && { nextToken: params.nextToken }),
+        ...(params.sellerProductId && { sellerProductId: params.sellerProductId }),
+        ...(params.status && { status: params.status }),
+      },
+    });
+  }
+
+  // 상품 삭제
+  async deleteProduct(vendorId: string, sellerProductId: number) {
+    return this.request<CoupangBaseResponse>({
+      method: 'DELETE',
+      path: `/v2/providers/seller_api/apis/api/v1/vendors/${vendorId}/products/${sellerProductId}`,
+    });
+  }
+
+  // 상품 가격/재고 수정
+  async updateProductPrice(vendorId: string, data: UpdatePriceRequest) {
+    return this.request<CoupangBaseResponse>({
+      method: 'PUT',
+      path: `/v2/providers/seller_api/apis/api/v1/vendors/${vendorId}/products/price`,
+      body: data,
+    });
+  }
+
+  // ==================== 카테고리 관련 API ====================
+
+  // 카테고리 메타 정보 조회
+  async getCategoryMeta(categoryId: number) {
+    return this.request<CoupangCategoryMetaResponse>({
+      method: 'GET',
+      path: `/v2/providers/seller_api/apis/api/v1/categories/${categoryId}/meta`,
+    });
+  }
+
+  // 카테고리 검색
+  async searchCategory(keyword: string) {
+    return this.request<CoupangCategorySearchResponse>({
+      method: 'GET',
+      path: `/v2/providers/seller_api/apis/api/v1/categories/search`,
+      query: { keyword },
+    });
+  }
+
+  // ==================== 정산 관련 API ====================
+
+  // 정산 내역 조회
+  async getSettlements(params: {
+    vendorId: string;
+    settleDateFrom: string; // yyyy-MM-dd
+    settleDateTo: string;
+    nextToken?: string;
+    maxPerPage?: number;
+  }) {
+    return this.request<CoupangSettlementResponse>({
+      method: 'GET',
+      path: `/v2/providers/openapi/apis/api/v4/vendors/${params.vendorId}/settlements`,
+      query: {
+        settleDateFrom: params.settleDateFrom,
+        settleDateTo: params.settleDateTo,
+        maxPerPage: params.maxPerPage || 50,
+        ...(params.nextToken && { nextToken: params.nextToken }),
+      },
+    });
+  }
+
+  // ==================== 반품/취소 관련 API ====================
+
+  // 취소 요청 목록 조회
+  async getCancelRequests(params: {
+    vendorId: string;
+    createdAtFrom?: string;
+    createdAtTo?: string;
+    cancelType?: string; // CANCEL, RETURN, EXCHANGE
+    maxPerPage?: number;
+    nextToken?: string;
+  }) {
+    return this.request<CoupangCancelListResponse>({
+      method: 'GET',
+      path: `/v2/providers/openapi/apis/api/v4/vendors/${params.vendorId}/returnRequests`,
+      query: {
+        createdAtFrom: params.createdAtFrom || this.getDefaultDateFrom(),
+        createdAtTo: params.createdAtTo || this.getDefaultDateTo(),
+        maxPerPage: params.maxPerPage || 50,
+        ...(params.cancelType && { cancelType: params.cancelType }),
+        ...(params.nextToken && { nextToken: params.nextToken }),
+      },
+    });
+  }
+
+  // 취소/반품 승인
+  async approveCancel(vendorId: string, receiptId: number) {
+    return this.request<CoupangBaseResponse>({
+      method: 'PUT',
+      path: `/v2/providers/openapi/apis/api/v4/vendors/${vendorId}/returnRequests/${receiptId}/approval`,
+    });
+  }
+
+  // ==================== 유틸리티 메서드 ====================
+
+  private getDefaultDateFrom(): string {
+    const date = new Date();
+    date.setDate(date.getDate() - 7); // 7일 전
+    return date.toISOString().split('T')[0];
+  }
+
+  private getDefaultDateTo(): string {
+    return new Date().toISOString().split('T')[0];
+  }
+}
+
+// ==================== 타입 정의 ====================
+
+export interface CoupangBaseResponse {
+  code: string;
+  message: string;
+}
+
+export interface CoupangOrderListResponse extends CoupangBaseResponse {
+  data: CoupangOrder[];
+  nextToken?: string;
+}
+
+export interface CoupangOrder {
+  shipmentBoxId: number;
+  orderId: number;
+  orderedAt: string;
+  ordererName: string;
+  ordererEmail: string;
+  ordererPhone: string;
+  receiverName: string;
+  receiverPhone: string;
+  postCode: string;
+  address: string;
+  addressDetail: string;
+  deliveryMessage: string;
+  shippingPrice: number;
+  remoteAreaPrice: number;
+  splitShipping: boolean;
+  ableSplitShipping: boolean;
+  orderItems: CoupangOrderItem[];
+  status: string;
+  paidAt: string;
+}
+
+export interface CoupangOrderItem {
+  vendorItemId: number;
+  vendorItemName: string;
+  vendorItemPackageType: string;
+  shippingCount: number;
+  salesPrice: number;
+  orderPrice: number;
+  discountPrice: number;
+  instantCouponDiscount: number;
+  downloadableCouponDiscount: number;
+  coupangDiscount: number;
+  externalVendorSkuCode: string;
+  etcInfoHeader: string;
+  etcInfoValue: string;
+  sellerProductId: number;
+  sellerProductName: string;
+  sellerProductItemId: number;
+  firstOptionName: string;
+  firstOptionValue: string;
+  secondOptionName: string;
+  secondOptionValue: string;
+  cancelCount: number;
+}
+
+export interface CoupangOrderDetailResponse extends CoupangBaseResponse {
+  data: CoupangOrder;
+}
+
+export interface ShipOrderRequest {
+  shipmentBoxId: number;
+  deliveryCompanyCode: string; // CJGLS, LOTTE, HANJIN, etc.
+  invoiceNumber: string;
+  splitShipping?: boolean;
+  vendorItemIds?: number[];
+}
+
+export interface CreateProductRequest {
+  displayCategoryCode: number;
+  sellerProductName: string;
+  vendorId: string;
+  saleStartedAt: string;
+  saleEndedAt: string;
+  brand: string;
+  generalProductName: string;
+  productGroup: string;
+  deliveryMethod: string;
+  deliveryCompanyCode: string;
+  deliveryChargeType: string;
+  deliveryCharge: number;
+  freeShipOverAmount: number;
+  deliveryChargeOnReturn: number;
+  remoteAreaDeliverable: string;
+  unionDeliveryType: string;
+  returnCenterCode: string;
+  returnCharge: number;
+  returnChargeVendor: string;
+  afterServiceInformation: string;
+  afterServiceContactNumber: string;
+  outboundShippingPlaceCode: number;
+  vendorUserId: string;
+  requested: boolean;
+  items: CreateProductItem[];
+  requiredDocuments: RequiredDocument[];
+  extraInfoMessage: string;
+  manufacture: string;
+  contents: ProductContent[];
+  notices: ProductNotice[];
+  attributes: ProductAttribute[];
+}
+
+export interface CreateProductItem {
+  itemName: string;
+  originalPrice: number;
+  salePrice: number;
+  maximumBuyCount: number;
+  maximumBuyForPerson: number;
+  maximumBuyForPersonPeriod: number;
+  outboundShippingTimeDay: number;
+  unitCount: number;
+  adultOnly: string;
+  taxType: string;
+  parallelImported: string;
+  overseasPurchased: string;
+  pccNeeded: string;
+  externalVendorSku: string;
+  barcode: string;
+  emptyBarcode: boolean;
+  emptyBarcodeReason: string;
+  modelNo: string;
+  extraProperties: Record<string, string>;
+  certifications: Certification[];
+  searchTags: string[];
+  images: ProductImage[];
+  notices: ProductNotice[];
+  attributes: ProductAttribute[];
+  contents: ProductContent[];
+  offerCondition: string;
+  offerDescription: string;
+}
+
+export interface RequiredDocument {
+  templateName: string;
+  documentPath: string;
+  vendorDocumentPath: string;
+}
+
+export interface Certification {
+  certificationType: string;
+  certificationCode: string;
+}
+
+export interface ProductImage {
+  imageOrder: number;
+  imageType: string;
+  cdnPath: string;
+  vendorPath: string;
+}
+
+export interface ProductNotice {
+  noticeCategoryName: string;
+  noticeCategoryDetailName: string;
+  content: string;
+}
+
+export interface ProductAttribute {
+  attributeTypeName: string;
+  attributeValueName: string;
+}
+
+export interface ProductContent {
+  contentsType: string;
+  contentDetails: ContentDetail[];
+}
+
+export interface ContentDetail {
+  content: string;
+  detailType: string;
+}
+
+export interface UpdatePriceRequest {
+  sellerProductId: number;
+  items: {
+    vendorItemId: number;
+    originalPrice: number;
+    salePrice: number;
+  }[];
+}
+
+export interface CoupangProductResponse extends CoupangBaseResponse {
+  data: {
+    sellerProductId: number;
+    statusName: string;
+    productId: number;
+  };
+}
+
+// 상품 상세 조회 응답
+export interface CoupangProductDetailItem {
+  vendorItemId: number;
+  vendorItemName: string;
+  itemName: string;
+  originalPrice: number;
+  salePrice: number;
+  maximumBuyCount?: number;
+  maximumBuyForPerson?: number;
+  outboundShippingTimeDay?: number;
+  adultOnly?: string;
+  taxType?: string;
+  parallelImported?: string;
+  overseasPurchased?: string;
+  externalVendorSku?: string;
+  barcode?: string;
+  modelNo?: string;
+  unitCount?: number;
+  offerCondition?: string;
+  images?: ProductImage[];
+  searchTags?: string[];
+  attributes?: ProductAttribute[];
+}
+
+export interface CoupangProductDetailResponse extends CoupangBaseResponse {
+  data: {
+    sellerProductId: number;
+    sellerProductName: string;
+    displayCategoryCode: number;
+    categoryId?: number;
+    productId?: number;
+    vendorId?: string;
+    saleStartedAt?: string;
+    saleEndedAt?: string;
+    displayProductName?: string;
+    brand?: string;
+    generalProductName?: string;
+    productGroup?: string;
+    statusName: string;
+    deliveryMethod?: string;
+    deliveryCompanyCode?: string;
+    deliveryChargeType?: string;
+    deliveryCharge?: number;
+    freeShipOverAmount?: number;
+    returnCenterCode?: string;
+    returnCharge?: number;
+    returnChargeVendor?: string;
+    afterServiceInformation?: string;
+    afterServiceContactNumber?: string;
+    outboundShippingPlaceCode?: number;
+    manufacture?: string;
+    requested?: boolean;
+    items?: CoupangProductDetailItem[];
+    contents?: ProductContent[];
+    notices?: ProductNotice[];
+    attributes?: ProductAttribute[];
+    extraInfoMessage?: string;
+  };
+}
+
+// 상품 목록 조회 응답 (seller-products API)
+export interface CoupangProductListItem {
+  sellerProductId: number;
+  sellerProductName: string;
+  displayCategoryCode: number;
+  categoryId?: number;
+  productId?: number;
+  vendorId?: string;
+  mdId?: string;
+  mdName?: string;
+  saleStartedAt?: string;
+  saleEndedAt?: string;
+  displayProductName?: string;
+  brand?: string;
+  generalProductName?: string;
+  productGroup?: string;
+  statusName: string; // 승인완료, 승인대기, 판매중지, 임시저장 등
+  deliveryMethod?: string;
+  deliveryCompanyCode?: string;
+  deliveryChargeType?: string;
+  deliveryCharge?: number;
+  returnCenterCode?: string;
+  returnCharge?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CoupangProductListResponse extends CoupangBaseResponse {
+  data: CoupangProductListItem[];
+  nextToken?: string;
+}
+
+export interface CoupangCategoryMetaResponse extends CoupangBaseResponse {
+  data: {
+    categoryId: number;
+    categoryName: string;
+    attributes: {
+      attributeTypeName: string;
+      required: boolean;
+      attributeValues: string[];
+    }[];
+    notices: {
+      noticeCategoryName: string;
+      required: boolean;
+      noticeCategoryDetailNames: string[];
+    }[];
+  };
+}
+
+export interface CoupangCategorySearchResponse extends CoupangBaseResponse {
+  data: {
+    categoryId: number;
+    categoryName: string;
+    wholeCategoryName: string;
+  }[];
+}
+
+export interface CoupangSettlementResponse extends CoupangBaseResponse {
+  data: {
+    settleDate: string;
+    orderId: number;
+    productTitle: string;
+    optionTitle: string;
+    quantity: number;
+    salePrice: number;
+    couponDiscount: number;
+    deliveryCharge: number;
+    commission: number;
+    settlementAmount: number;
+  }[];
+  nextToken?: string;
+}
+
+export interface CoupangCancelListResponse extends CoupangBaseResponse {
+  data: {
+    receiptId: number;
+    orderId: number;
+    cancelType: string;
+    cancelReason: string;
+    cancelReasonDetail: string;
+    createdAt: string;
+    status: string;
+  }[];
+  nextToken?: string;
+}
+
+// 택배사 코드
+export const DELIVERY_COMPANY_CODES = {
+  CJGLS: 'CJ대한통운',
+  LOTTE: '롯데택배',
+  HANJIN: '한진택배',
+  EPOST: '우체국택배',
+  KGB: 'KGB택배',
+  LOGEN: '로젠택배',
+  DAESIN: '대신택배',
+  ILYANG: '일양로지스',
+  CHUNIL: '천일택배',
+  HDEXP: '합동택배',
+  CVSNET: 'GS편의점택배',
+  CU: 'CU편의점택배',
+} as const;
+
+// 싱글톤 인스턴스
+let clientInstance: CoupangClient | null = null;
+
+export function getCoupangClient(): CoupangClient {
+  if (!clientInstance) {
+    clientInstance = new CoupangClient();
+  }
+  return clientInstance;
+}
