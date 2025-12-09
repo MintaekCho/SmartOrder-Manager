@@ -12,6 +12,7 @@
     "@prisma/client": "^7.1.0",
     "@tanstack/react-query": "^5.90.12",
     "fabric": "^6.9.0",
+    "html-to-image": "^1.11.13",
     "lucide-react": "^0.556.0",
     "next": "16.0.7",
     "playwright": "^1.57.0",

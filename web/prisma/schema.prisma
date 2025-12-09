@@ -6,7 +6,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 // ============================================
@@ -318,4 +317,210 @@ enum JobStatus {
   RUNNING
   COMPLETED
   FAILED
+}
+
+// ============================================
+// 리서치 - 키워드 분석
+// ============================================
+
+model Keyword {
+  id              String   @id @default(cuid())
+
+  keyword         String   @unique
+
+  // 네이버 검색량 데이터
+  naverSearchVolume    Int?      // 월간 검색량
+  naverSearchTrend     Json?     // 최근 30일 트렌드 데이터
+
+  // 쿠팡 데이터
+  coupangProductCount  Int?      // 검색 결과 상품 수
+  coupangAvgPrice      Int?      // 평균 가격
+  coupangMinPrice      Int?      // 최저 가격
+  coupangMaxPrice      Int?      // 최고 가격
+
+  // 경쟁 강도 (계산된 지표)
+  competitionScore     Float?    // 0~100 경쟁 강도
+  opportunityScore     Float?    // 0~100 기회 점수
+
+  // 관계
+  snapshots       KeywordSnapshot[]
+  trackedProducts TrackedProduct[]
+
+  lastAnalyzedAt  DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([opportunityScore])
+  @@map("keywords")
+}
+
+// 키워드 히스토리 (시계열 데이터)
+model KeywordSnapshot {
+  id              String   @id @default(cuid())
+
+  keywordId       String
+  keyword         Keyword  @relation(fields: [keywordId], references: [id], onDelete: Cascade)
+
+  naverSearchVolume    Int?
+  coupangProductCount  Int?
+  coupangAvgPrice      Int?
+
+  recordedAt      DateTime @default(now())
+
+  @@index([keywordId, recordedAt])
+  @@map("keyword_snapshots")
+}
+
+// ============================================
+// 리서치 - 쿠팡 상품 추적
+// ============================================
+
+model TrackedProduct {
+  id                  String   @id @default(cuid())
+
+  // 쿠팡 상품 정보
+  coupangProductId    String   @unique
+  coupangUrl          String
+
+  name                String
+  brandName           String?
+  sellerName          String?
+
+  // 현재 상태
+  currentPrice        Int
+  originalPrice       Int?
+  discountRate        Int?
+
+  currentReviewCount  Int      @default(0)
+  currentRating       Float?
+
+  // 배송 정보
+  isRocketDelivery    Boolean  @default(false)
+  isFreeShipping      Boolean  @default(false)
+
+  // 검색 순위 (키워드별)
+  keywordId           String?
+  keyword             Keyword? @relation(fields: [keywordId], references: [id])
+  searchRank          Int?     // 해당 키워드 검색 시 순위
+
+  // 관계
+  priceSnapshots      ProductPriceSnapshot[]
+  reviewSnapshots     ProductReviewSnapshot[]
+
+  // 도매 매칭 정보
+  matchedWholesaleUrl String?
+  wholesalePrice      Int?
+  estimatedMargin     Float?   // 예상 마진율
+
+  isTracking          Boolean  @default(true)
+
+  lastCrawledAt       DateTime?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([keywordId, searchRank])
+  @@index([estimatedMargin])
+  @@map("tracked_products")
+}
+
+// 상품 가격 스냅샷
+model ProductPriceSnapshot {
+  id              String   @id @default(cuid())
+
+  productId       String
+  product         TrackedProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  price           Int
+  originalPrice   Int?
+
+  recordedAt      DateTime @default(now())
+
+  @@index([productId, recordedAt])
+  @@map("product_price_snapshots")
+}
+
+// 리뷰 스냅샷 (리뷰 증가 속도 추적)
+model ProductReviewSnapshot {
+  id              String   @id @default(cuid())
+
+  productId       String
+  product         TrackedProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  reviewCount     Int
+  rating          Float?
+
+  // 계산된 지표
+  reviewGrowthRate Float?   // 일일 리뷰 증가율
+
+  recordedAt      DateTime @default(now())
+
+  @@index([productId, recordedAt])
+  @@map("product_review_snapshots")
+}
+
+// ============================================
+// 리서치 - 마진 분석
+// ============================================
+
+model MarginAnalysis {
+  id                  String   @id @default(cuid())
+
+  // 검색 조건
+  keyword             String
+
+  // 쿠팡 상품 정보
+  coupangProductId    String
+  coupangProductName  String
+  coupangPrice        Int
+  coupangUrl          String
+
+  // 도매 상품 정보
+  wholesaleSource     String   // domeggook, etc.
+  wholesaleProductId  String?
+  wholesaleProductName String
+  wholesalePrice      Int
+  wholesaleUrl        String
+
+  // 마진 계산
+  priceDifference     Int      // 판매가 - 도매가
+  marginRate          Float    // 마진율 (%)
+  estimatedProfit     Int      // 예상 수익 (수수료 제외 후)
+
+  // 유사도 점수
+  similarityScore     Float?   // 상품 유사도 (0~1)
+
+  analyzedAt          DateTime @default(now())
+
+  @@index([keyword, marginRate])
+  @@index([analyzedAt])
+  @@map("margin_analyses")
+}
+
+// ============================================
+// 리서치 - 네이버 검색 트렌드
+// ============================================
+
+model NaverTrend {
+  id              String   @id @default(cuid())
+
+  keyword         String
+
+  // 기간
+  startDate       DateTime
+  endDate         DateTime
+
+  // 트렌드 데이터 (일별)
+  trendData       Json     // [{date: "2024-01-01", ratio: 85}, ...]
+
+  // 요약 지표
+  avgRatio        Float?   // 평균 비율
+  maxRatio        Float?   // 최대 비율
+  minRatio        Float?   // 최소 비율
+  trendDirection  String?  // "rising", "falling", "stable"
+
+  createdAt       DateTime @default(now())
+
+  @@unique([keyword, startDate, endDate])
+  @@index([keyword])
+  @@map("naver_trends")
 }
