@@ -282,11 +282,14 @@ export class CoupangClient {
   // ==================== 반품/취소 관련 API ====================
 
   // 취소 요청 목록 조회
+  // 쿠팡 API: status 파라미터 필수 (UC, CC, CR 등)
+  // UC: 승인대기, CC: 승인완료, CR: 거절, RC: 수거완료
   async getCancelRequests(params: {
     vendorId: string;
     createdAtFrom?: string;
     createdAtTo?: string;
     cancelType?: string; // CANCEL, RETURN, EXCHANGE
+    status?: string; // UC(승인대기), CC(승인완료), CR(거절), RC(수거완료)
     maxPerPage?: number;
     nextToken?: string;
   }) {
@@ -296,6 +299,7 @@ export class CoupangClient {
       query: {
         createdAtFrom: params.createdAtFrom || this.getDefaultDateFrom(),
         createdAtTo: params.createdAtTo || this.getDefaultDateTo(),
+        status: params.status || 'UC', // 기본값: 승인대기
         maxPerPage: params.maxPerPage || 50,
         ...(params.cancelType && { cancelType: params.cancelType }),
         ...(params.nextToken && { nextToken: params.nextToken }),

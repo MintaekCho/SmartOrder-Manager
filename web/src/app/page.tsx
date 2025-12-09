@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState, useRef } from 'react';
 import { DashboardLayout } from '@/components/layout';
 import { StatCard, DataTable, Badge, Button } from '@/components/ui';
 import { RevenueChart, CategoryChart } from '@/components/charts';
@@ -9,73 +10,41 @@ import {
   TrendingUp,
   AlertCircle,
   Eye,
+  Loader2,
 } from 'lucide-react';
 
-// 임시 데이터
-const recentOrders = [
-  {
-    id: '1',
-    orderId: '#COU-12345',
-    productName: '블루투스 이어폰 TWS-500',
-    quantity: 1,
-    amount: 25000,
-    status: 'pending' as const,
-    orderedAt: '2024-01-15 14:30',
-  },
-  {
-    id: '2',
-    orderId: '#COU-12344',
-    productName: 'USB-C 충전 케이블 1.5m',
-    quantity: 2,
-    amount: 12000,
-    status: 'processing' as const,
-    orderedAt: '2024-01-15 13:22',
-  },
-  {
-    id: '3',
-    orderId: '#COU-12343',
-    productName: '무선 마우스 M-200',
-    quantity: 1,
-    amount: 18500,
-    status: 'completed' as const,
-    orderedAt: '2024-01-15 11:45',
-  },
-  {
-    id: '4',
-    orderId: '#COU-12342',
-    productName: '노트북 거치대 알루미늄',
-    quantity: 1,
-    amount: 35000,
-    status: 'completed' as const,
-    orderedAt: '2024-01-15 10:15',
-  },
-  {
-    id: '5',
-    orderId: '#COU-12341',
-    productName: '미니 선풍기 휴대용',
-    quantity: 3,
-    amount: 27000,
-    status: 'error' as const,
-    orderedAt: '2024-01-15 09:30',
-  },
-];
+// 타입 정의
+interface DashboardStats {
+  todayOrders: number;
+  orderChange: number;
+  pendingOrders: number;
+  todayRevenue: number;
+  revenueChange: number;
+  totalProducts: number;
+  activeProducts: number;
+}
 
-const revenueData = [
-  { date: '01/09', revenue: 1250000, profit: 187500 },
-  { date: '01/10', revenue: 980000, profit: 147000 },
-  { date: '01/11', revenue: 1520000, profit: 228000 },
-  { date: '01/12', revenue: 1180000, profit: 177000 },
-  { date: '01/13', revenue: 2100000, profit: 315000 },
-  { date: '01/14', revenue: 1850000, profit: 277500 },
-  { date: '01/15', revenue: 2340000, profit: 351000 },
-];
+interface Order {
+  id: string;
+  orderId: string;
+  productName: string;
+  quantity: number;
+  amount: number;
+  status: 'pending' | 'processing' | 'completed' | 'error';
+  orderedAt: string;
+}
 
-const categoryData = [
-  { name: '전자기기', value: 4520000, color: '#4AC1E0' },
-  { name: '생활용품', value: 2180000, color: '#4CAF50' },
-  { name: '패션잡화', value: 1650000, color: '#F5A623' },
-  { name: '뷰티', value: 890000, color: '#E74C3C' },
-];
+interface RevenueData {
+  date: string;
+  revenue: number;
+  profit: number;
+}
+
+interface CategoryData {
+  name: string;
+  value: number;
+  color: string;
+}
 
 const statusMap = {
   pending: { label: '발주 대기', variant: 'pending' as const },
@@ -85,12 +54,66 @@ const statusMap = {
 };
 
 export default function DashboardPage() {
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [revenueData, setRevenueData] = useState<RevenueData[]>([]);
+  const [categoryData, setCategoryData] = useState<CategoryData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // 초기 로드 여부 체크
+  const isInitialMount = useRef(true);
+
+  useEffect(() => {
+    if (!isInitialMount.current) return;
+    isInitialMount.current = false;
+
+    const fetchDashboardData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        // 병렬로 모든 데이터 가져오기
+        const [statsRes, ordersRes, revenueRes, categoryRes] = await Promise.all([
+          fetch('/api/dashboard/stats'),
+          fetch('/api/dashboard/recent-orders?limit=5'),
+          fetch('/api/dashboard/revenue?days=7'),
+          fetch('/api/dashboard/category-sales'),
+        ]);
+
+        // 에러 체크
+        if (!statsRes.ok || !ordersRes.ok || !revenueRes.ok || !categoryRes.ok) {
+          throw new Error('API 호출 실패');
+        }
+
+        const [statsData, ordersData, revenueDataRes, categoryDataRes] = await Promise.all([
+          statsRes.json(),
+          ordersRes.json(),
+          revenueRes.json(),
+          categoryRes.json(),
+        ]);
+
+        setStats(statsData);
+        setOrders(ordersData.orders || []);
+        setRevenueData(revenueDataRes.revenueData || []);
+        setCategoryData(categoryDataRes.categoryData || []);
+      } catch (err) {
+        console.error('Dashboard data fetch error:', err);
+        setError(err instanceof Error ? err.message : '데이터를 불러오는데 실패했습니다');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, []);
+
   const orderColumns = [
     { key: 'orderId', header: '주문번호', width: '120px' },
     {
       key: 'productName',
       header: '상품명',
-      render: (item: (typeof recentOrders)[0]) => (
+      render: (item: Order) => (
         <span className="font-medium">{item.productName}</span>
       ),
     },
@@ -98,20 +121,20 @@ export default function DashboardPage() {
       key: 'quantity',
       header: '수량',
       width: '80px',
-      render: (item: (typeof recentOrders)[0]) => `${item.quantity}개`,
+      render: (item: Order) => `${item.quantity}개`,
     },
     {
       key: 'amount',
       header: '금액',
       width: '100px',
-      render: (item: (typeof recentOrders)[0]) =>
+      render: (item: Order) =>
         `${item.amount.toLocaleString()}원`,
     },
     {
       key: 'status',
       header: '상태',
       width: '100px',
-      render: (item: (typeof recentOrders)[0]) => (
+      render: (item: Order) => (
         <Badge variant={statusMap[item.status].variant} dot>
           {statusMap[item.status].label}
         </Badge>
@@ -134,6 +157,47 @@ export default function DashboardPage() {
     },
   ];
 
+  if (loading) {
+    return (
+      <DashboardLayout
+        title="대시보드"
+        breadcrumb={[{ name: '홈', href: '/' }, { name: '대시보드' }]}
+      >
+        <div className="flex items-center justify-center h-[60vh]">
+          <div className="flex flex-col items-center gap-4">
+            <Loader2 className="w-8 h-8 animate-spin text-[var(--color-primary-600)]" />
+            <p className="text-[var(--color-text-secondary)]">데이터를 불러오는 중...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <DashboardLayout
+        title="대시보드"
+        breadcrumb={[{ name: '홈', href: '/' }, { name: '대시보드' }]}
+      >
+        <div className="flex items-center justify-center h-[60vh]">
+          <div className="flex flex-col items-center gap-4 text-center">
+            <AlertCircle className="w-12 h-12 text-[var(--color-error)]" />
+            <div>
+              <p className="text-lg font-medium text-[var(--color-text-primary)]">데이터 로드 실패</p>
+              <p className="text-[var(--color-text-secondary)] mt-1">{error}</p>
+              <p className="text-sm text-[var(--color-text-tertiary)] mt-2">
+                쿠팡 Wing API 설정을 확인해주세요.
+              </p>
+            </div>
+            <Button onClick={() => window.location.reload()}>
+              다시 시도
+            </Button>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout
       title="대시보드"
@@ -143,33 +207,33 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
         <StatCard
           title="오늘 주문"
-          value={127}
+          value={stats?.todayOrders || 0}
           icon={<ShoppingCart size={24} className="text-[var(--color-primary-600)]" />}
           iconBgColor="bg-[var(--color-primary-100)]"
-          change={12}
+          change={stats?.orderChange}
           changeLabel="전일 대비"
         />
         <StatCard
           title="미처리 주문"
-          value={17}
+          value={stats?.pendingOrders || 0}
           icon={<AlertCircle size={24} className="text-[var(--color-warning)]" />}
           iconBgColor="bg-[#FFF3E0]"
           subtitle="발주 대기 중"
         />
         <StatCard
           title="오늘 매출"
-          value="2,340,000원"
+          value={`${(stats?.todayRevenue || 0).toLocaleString()}원`}
           icon={<TrendingUp size={24} className="text-[var(--color-success)]" />}
           iconBgColor="bg-[#E8F5E9]"
-          change={8.5}
+          change={stats?.revenueChange}
           changeLabel="전일 대비"
         />
         <StatCard
           title="등록 상품"
-          value={342}
+          value={stats?.totalProducts || 0}
           icon={<Package size={24} className="text-[var(--color-info)]" />}
           iconBgColor="bg-[#E3F2FD]"
-          subtitle="판매중 289개"
+          subtitle={`판매중 ${stats?.activeProducts || 0}개`}
         />
       </div>
 
@@ -187,13 +251,14 @@ export default function DashboardPage() {
       <DataTable
         title="최근 주문"
         columns={orderColumns}
-        data={recentOrders}
+        data={orders}
         actions={
-          <Button variant="ghost" size="sm">
+          <Button variant="ghost" size="sm" onClick={() => window.location.href = '/orders'}>
             전체 보기
           </Button>
         }
         onRowClick={(item) => console.log('Clicked:', item)}
+        emptyMessage="최근 주문이 없습니다."
       />
     </DashboardLayout>
   );

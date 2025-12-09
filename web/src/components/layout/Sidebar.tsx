@@ -22,6 +22,7 @@ import {
   Building2,
   Calculator,
   Wrench,
+  Sparkles,
 } from 'lucide-react';
 
 interface MenuItem {
@@ -65,6 +66,7 @@ const menuItems: MenuItem[] = [
       { name: '주문 목록', href: '/orders' },
       { name: '발주 관리', href: '/orders/fulfillment' },
       { name: '배송 추적', href: '/orders/tracking' },
+      { name: '반품/환불', href: '/orders/returns' },
     ],
   },
   {
@@ -73,11 +75,17 @@ const menuItems: MenuItem[] = [
     icon: <Building2 size={20} />,
   },
   {
+    name: '정산 관리',
+    href: '/settlements',
+    icon: <BarChart3 size={20} />,
+  },
+  {
     name: '도구',
     href: '/tools',
     icon: <Wrench size={20} />,
     children: [
       { name: '마진 계산기', href: '/tools/margin-calculator' },
+      { name: 'AI 썸네일', href: '/tools/ai-thumbnail' },
     ],
   },
   {

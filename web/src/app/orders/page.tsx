@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { DashboardLayout } from '@/components/layout';
 import { Button, Input, Select, Card, Badge, DataTable } from '@/components/ui';
 import {
@@ -78,16 +78,19 @@ export default function OrdersPage() {
   // 주문 상세 모달
   const [selectedOrderDetail, setSelectedOrderDetail] = useState<OrderData | null>(null);
 
+  // 초기 로드 여부 체크
+  const isInitialMount = useRef(true);
+
   // 주문 목록 조회
-  const fetchOrders = useCallback(async () => {
+  const fetchOrders = async (status: string, from: string, to: string) => {
     setIsLoading(true);
     setError(null);
 
     try {
       const params = new URLSearchParams({
-        status: statusFilter,
-        createdAtFrom: dateFrom,
-        createdAtTo: dateTo,
+        status,
+        createdAtFrom: from,
+        createdAtTo: to,
       });
 
       const response = await fetch(`/api/coupang/orders?${params}`);
@@ -125,16 +128,19 @@ export default function OrdersPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [statusFilter, dateFrom, dateTo]);
+  };
 
-  // 페이지 로드 시 자동 조회
+  // 페이지 로드 시 자동 조회 (한 번만)
   useEffect(() => {
-    fetchOrders();
-  }, [statusFilter, fetchOrders]);
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      fetchOrders(statusFilter, dateFrom, dateTo);
+    }
+  }, []);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await fetchOrders();
+    await fetchOrders(statusFilter, dateFrom, dateTo);
     setIsRefreshing(false);
   };
 
@@ -330,7 +336,10 @@ export default function OrdersPage() {
           return (
             <div
               key={value}
-              onClick={() => setStatusFilter(value)}
+              onClick={() => {
+                setStatusFilter(value);
+                fetchOrders(value, dateFrom, dateTo);
+              }}
               className={`p-4 rounded-lg border cursor-pointer transition-all ${
                 statusFilter === value
                   ? 'border-[var(--color-primary-500)] bg-[var(--color-primary-50)]'

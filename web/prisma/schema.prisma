@@ -9,20 +9,28 @@ datasource db {
 }
 
 // ============================================
-// 사용자 관련
+// NextAuth.js 인증 관련
 // ============================================
 
 model User {
   id             String    @id @default(cuid())
-  email          String    @unique
-  name           String
-  passwordHash   String
+  email          String?   @unique
+  emailVerified  DateTime?
+  name           String?
+  image          String?
   telegramChatId String?
 
   // 설정 (JSON)
   settings       Json      @default("{}")
 
-  // 관계
+  // NextAuth 관계
+  accounts       Account[]
+  sessions       Session[]
+
+  // 구독 관계
+  subscription   Subscription?
+
+  // 비즈니스 관계
   products       Product[]
   orders         Order[]
 
@@ -30,6 +38,127 @@ model User {
   updatedAt      DateTime  @updatedAt
 
   @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ============================================
+// 구독 및 결제 관련
+// ============================================
+
+model Subscription {
+  id               String           @id @default(cuid())
+  userId           String           @unique
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // 구독 플랜
+  plan             SubscriptionPlan @default(FREE)
+  status           SubscriptionStatus @default(ACTIVE)
+
+  // 토스페이먼츠 빌링키 (정기결제용)
+  billingKey       String?
+  customerKey      String?          @unique
+
+  // 구독 기간
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
+
+  // 취소 정보
+  cancelAtPeriodEnd  Boolean       @default(false)
+  canceledAt         DateTime?
+
+  // 결제 내역
+  payments           Payment[]
+
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  @@map("subscriptions")
+}
+
+enum SubscriptionPlan {
+  FREE
+  PREMIUM
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELED
+  PAST_DUE
+  EXPIRED
+}
+
+model Payment {
+  id               String        @id @default(cuid())
+  subscriptionId   String
+  subscription     Subscription  @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  // 토스페이먼츠 결제 정보
+  paymentKey       String?       @unique
+  orderId          String        @unique
+  amount           Int
+
+  // 결제 상태
+  status           PaymentStatus @default(PENDING)
+
+  // 결제 방법
+  method           String?       // CARD, TRANSFER, etc.
+  cardCompany      String?
+  cardNumber       String?       // 마스킹된 카드번호
+
+  // 실패 정보
+  failReason       String?
+
+  paidAt           DateTime?
+  createdAt        DateTime      @default(now())
+
+  @@index([subscriptionId])
+  @@map("payments")
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  CANCELED
+  REFUNDED
 }
 
 // ============================================

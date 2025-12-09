@@ -1,0 +1,16 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "buildCommand": "npx prisma generate && npm run build",
+  "regions": ["icn1"],
+  "crons": [
+    {
+      "path": "/api/cron/billing",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/sync-orders",
+      "schedule": "*/15 * * * *"
+    }
+  ]
+}
