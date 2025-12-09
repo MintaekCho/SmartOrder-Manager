@@ -48,6 +48,7 @@ import {
   GripVertical,
 } from 'lucide-react';
 import * as fabric from 'fabric';
+import { CANVAS_TEMPLATES, CanvasTemplate } from '@/lib/templates/canvas-templates';
 
 interface ImageFile {
   name: string;
@@ -65,13 +66,7 @@ interface FrameTemplate {
   height: number;
 }
 
-// 템플릿 타입 정의
-interface ProductTemplate {
-  id: string;
-  name: string;
-  category: 'intro' | 'fresh' | 'info' | 'origin';
-  preview: string; // 미리보기 설명
-}
+// ProductTemplate 타입은 canvas-templates.ts에서 CanvasTemplate으로 대체됨
 
 // 뱃지 타입 정의
 interface BadgeTemplate {
@@ -91,13 +86,7 @@ const FRAMES: FrameTemplate[] = [
   { id: 'leaf', name: '나뭇잎', icon: <Leaf size={20} />, type: 'leaf', width: 300, height: 300 },
 ];
 
-// 농수산물 템플릿 목록
-const TEMPLATES: ProductTemplate[] = [
-  { id: 'product-intro', name: '상품 소개', category: 'intro', preview: '상품명 + 원산지 + 중량' },
-  { id: 'fresh-badge', name: '신선도 강조', category: 'fresh', preview: '산지직송 + 이미지' },
-  { id: 'box-info', name: '박스 구성', category: 'info', preview: '구성 수량 안내' },
-  { id: 'origin-info', name: '원산지 표시', category: 'origin', preview: '원산지 강조' },
-];
+// 템플릿 목록은 CANVAS_TEMPLATES에서 import됨
 
 // 뱃지 목록
 const BADGES: BadgeTemplate[] = [
@@ -1323,207 +1312,67 @@ export default function DetailPageEditor({ onExport, initialImages = [] }: Detai
     fabricCanvasRef.current.renderAll();
   }, []);
 
-  // 템플릿 추가
-  const addTemplate = useCallback((template: ProductTemplate) => {
+  // 템플릿 추가 (새로운 JSON 기반 구현)
+  const addTemplate = useCallback((template: CanvasTemplate) => {
     if (!fabricCanvasRef.current) return;
 
-    const elements: fabric.FabricObject[] = [];
-    const centerX = COUPANG_WIDTH / 2;
-    let currentY = 50;
-
-    switch (template.id) {
-      case 'product-intro':
-        // 상품 소개 템플릿
-        // 원형 이미지 프레임
-        const introCircle = new fabric.Circle({
-          radius: 150,
-          left: centerX - 150,
-          top: currentY,
-          fill: '#f5f5f5',
-          stroke: '#4caf50',
-          strokeWidth: 4,
-        });
-        (introCircle as any).isFrame = true;
-        elements.push(introCircle);
-        currentY += 320;
-
-        // 상품명
-        const productName = new fabric.Textbox('상품명을 입력하세요', {
-          left: 40,
-          top: currentY,
-          width: COUPANG_WIDTH - 80,
-          fontSize: 32,
-          fontFamily: 'Noto Sans KR, sans-serif',
-          fontWeight: 'bold',
-          fill: '#212121',
-          textAlign: 'center',
-        });
-        elements.push(productName);
-        currentY += 50;
-
-        // 원산지
-        const origin = new fabric.Textbox('🌿 원산지: 국내산', {
-          left: 40,
-          top: currentY,
-          width: COUPANG_WIDTH - 80,
-          fontSize: 18,
-          fontFamily: 'Noto Sans KR, sans-serif',
-          fill: '#4caf50',
-          textAlign: 'center',
-        });
-        elements.push(origin);
-        currentY += 35;
-
-        // 중량
-        const weight = new fabric.Textbox('📦 중량: 3kg (12~15과)', {
-          left: 40,
-          top: currentY,
-          width: COUPANG_WIDTH - 80,
-          fontSize: 16,
-          fontFamily: 'Noto Sans KR, sans-serif',
-          fill: '#757575',
-          textAlign: 'center',
-        });
-        elements.push(weight);
-        break;
-
-      case 'fresh-badge':
-        // 신선도 강조 템플릿
-        // 산지직송 배너
-        const banner = new fabric.Rect({
-          left: 0,
-          top: currentY,
-          width: COUPANG_WIDTH,
-          height: 60,
-          fill: '#2e7d32',
-        });
-        elements.push(banner);
-
-        const bannerText = new fabric.Text('🚚 산지직송 | 오늘 수확, 오늘 발송!', {
-          left: centerX - 180,
-          top: currentY + 18,
-          fontSize: 20,
-          fontFamily: 'Noto Sans KR, sans-serif',
-          fontWeight: 'bold',
-          fill: '#ffffff',
-        });
-        elements.push(bannerText);
-        currentY += 80;
-
-        // 이미지 프레임
-        const freshFrame = new fabric.Rect({
-          left: 40,
-          top: currentY,
-          width: COUPANG_WIDTH - 80,
-          height: 400,
-          fill: '#f1f8e9',
-          stroke: '#8bc34a',
-          strokeWidth: 3,
-          rx: 20,
-          ry: 20,
-        });
-        (freshFrame as any).isFrame = true;
-        elements.push(freshFrame);
-        break;
-
-      case 'box-info':
-        // 박스 구성 템플릿
-        const boxTitle = new fabric.Text('📦 박스 구성 안내', {
-          left: centerX - 100,
-          top: currentY,
-          fontSize: 24,
-          fontFamily: 'Noto Sans KR, sans-serif',
-          fontWeight: 'bold',
-          fill: '#424242',
-        });
-        elements.push(boxTitle);
-        currentY += 50;
-
-        // 구성 정보 박스들
-        const sizes = ['소과 (15~18과)', '중과 (12~14과)', '대과 (9~11과)'];
-        sizes.forEach((size, i) => {
-          const box = new fabric.Rect({
-            left: 40 + (i * 235),
-            top: currentY,
-            width: 220,
-            height: 120,
-            fill: i === 1 ? '#fff3e0' : '#fafafa',
-            stroke: i === 1 ? '#ff9800' : '#e0e0e0',
-            strokeWidth: 2,
-            rx: 10,
-            ry: 10,
-          });
-          elements.push(box);
-
-          const sizeText = new fabric.Text(size, {
-            left: 60 + (i * 235),
-            top: currentY + 45,
-            fontSize: 16,
-            fontFamily: 'Noto Sans KR, sans-serif',
-            fontWeight: i === 1 ? 'bold' : 'normal',
-            fill: '#424242',
-          });
-          elements.push(sizeText);
-        });
-        break;
-
-      case 'origin-info':
-        // 원산지 표시 템플릿
-        const originBg = new fabric.Rect({
-          left: 40,
-          top: currentY,
-          width: COUPANG_WIDTH - 80,
-          height: 150,
-          fill: '#e8f5e9',
-          stroke: '#4caf50',
-          strokeWidth: 2,
-          rx: 15,
-          ry: 15,
-        });
-        elements.push(originBg);
-
-        const mapIcon = new fabric.Text('📍', {
-          left: 80,
-          top: currentY + 40,
-          fontSize: 48,
-        });
-        elements.push(mapIcon);
-
-        const originTitle = new fabric.Text('원산지', {
-          left: 150,
-          top: currentY + 35,
-          fontSize: 16,
-          fontFamily: 'Noto Sans KR, sans-serif',
-          fill: '#757575',
-        });
-        elements.push(originTitle);
-
-        const originValue = new fabric.Textbox('전남 해남', {
-          left: 150,
-          top: currentY + 60,
-          width: 400,
-          fontSize: 32,
-          fontFamily: 'Noto Sans KR, sans-serif',
-          fontWeight: 'bold',
-          fill: '#2e7d32',
-        });
-        elements.push(originValue);
-        break;
-    }
-
-    // 모든 요소 추가
-    elements.forEach(el => fabricCanvasRef.current.add(el));
-    fabricCanvasRef.current.renderAll();
-
-    // 캔버스 높이 조정
-    const lastEl = elements[elements.length - 1];
-    if (lastEl) {
-      const bottom = (lastEl.top || 0) + (lastEl.height || 0) + 100;
-      if (bottom > canvasHeight) {
-        updateCanvasHeight(bottom);
+    // 캔버스 초기화 확인 모달
+    const currentObjects = fabricCanvasRef.current.getObjects();
+    if (currentObjects.length > 0) {
+      if (!window.confirm('현재 캔버스의 내용을 지우고 템플릿을 불러올까요?')) {
+        return;
       }
     }
-  }, [canvasHeight]);
+
+    // 캔버스 초기화
+    fabricCanvasRef.current.clear();
+    fabricCanvasRef.current.backgroundColor = '#ffffff';
+
+    // 캔버스 높이 조정
+    setCanvasHeight(template.canvasHeight);
+    fabricCanvasRef.current.setHeight(template.canvasHeight);
+
+    // JSON에서 객체들 로드
+    const fabricJson = template.fabricJson as { objects: any[] };
+
+    fabricJson.objects.forEach((objData: any) => {
+      let fabricObj: fabric.FabricObject | null = null;
+
+      // shadow 속성 제거 (호환성 문제)
+      const cleanObjData = { ...objData };
+      delete cleanObjData.shadow;
+
+      switch (objData.type) {
+        case 'rect':
+          fabricObj = new fabric.Rect(cleanObjData);
+          break;
+        case 'circle':
+          fabricObj = new fabric.Circle(cleanObjData);
+          break;
+        case 'textbox':
+          fabricObj = new fabric.Textbox(cleanObjData.text || '', cleanObjData);
+          break;
+        case 'text':
+          fabricObj = new fabric.Text(cleanObjData.text || '', cleanObjData);
+          break;
+      }
+
+      if (fabricObj) {
+        // 커스텀 속성 복원
+        if (objData._customId) {
+          (fabricObj as any)._customId = objData._customId;
+        }
+        if (objData._customName) {
+          (fabricObj as any)._customName = objData._customName;
+        }
+        fabricCanvasRef.current.add(fabricObj);
+      }
+    });
+
+    fabricCanvasRef.current.renderAll();
+    updateLayers();
+    saveHistory();
+  }, [updateLayers, saveHistory]);
 
   return (
     <div className="flex flex-col h-full">
@@ -1951,25 +1800,37 @@ export default function DetailPageEditor({ onExport, initialImages = [] }: Detai
             {leftPanelTab === 'templates' && (
               <div className="p-3">
                 <p className="text-xs text-[var(--color-gray-500)] mb-3">
-                  농수산물 상세페이지 템플릿
+                  상세페이지 템플릿을 선택하세요
                 </p>
                 <div className="space-y-2">
-                  {TEMPLATES.map((template) => (
+                  {CANVAS_TEMPLATES.map((template) => (
                     <button
                       key={template.id}
                       onClick={() => addTemplate(template)}
                       className="w-full p-3 border border-[var(--color-gray-300)] rounded-lg hover:border-[var(--color-primary-500)] hover:bg-[var(--color-primary-50)] transition-colors text-left"
                     >
                       <div className="flex items-center gap-2 mb-1">
-                        {template.category === 'intro' && <Apple size={16} className="text-green-600" />}
-                        {template.category === 'fresh' && <Truck size={16} className="text-green-600" />}
-                        {template.category === 'info' && <Layout size={16} className="text-orange-600" />}
-                        {template.category === 'origin' && <MapPin size={16} className="text-green-600" />}
-                        <span className="text-sm font-medium text-[var(--color-gray-800)]">{template.name}</span>
+                        <div
+                          className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm"
+                          style={{ backgroundColor: template.thumbnail }}
+                        >
+                          {template.category === 'fruit' && '🍊'}
+                          {template.category === 'vegetable' && '🥬'}
+                          {template.category === 'seafood' && '🐟'}
+                          {template.category === 'general' && '📦'}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <span className="text-sm font-medium text-[var(--color-gray-800)] block truncate">{template.name}</span>
+                          <span className="text-xs text-[var(--color-gray-500)] block truncate">{template.description}</span>
+                        </div>
                       </div>
-                      <p className="text-xs text-[var(--color-gray-500)] ml-6">{template.preview}</p>
                     </button>
                   ))}
+                </div>
+                <div className="mt-4 p-3 bg-[var(--color-gray-100)] rounded-lg">
+                  <p className="text-xs text-[var(--color-gray-600)]">
+                    💡 템플릿을 불러온 후 텍스트를 클릭하여 수정하고, 이미지를 드래그하여 추가하세요
+                  </p>
                 </div>
               </div>
             )}

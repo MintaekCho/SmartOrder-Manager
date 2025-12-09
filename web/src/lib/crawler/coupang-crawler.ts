@@ -1,9 +1,26 @@
 /**
  * 쿠팡 실제 크롤러
  * Playwright를 사용하여 쿠팡 베스트셀러 상품 정보를 수집
+ * Stealth 모드로 봇 탐지 우회
  */
 
-import { chromium, Browser, Page } from 'playwright';
+import { chromium, Browser, Page, BrowserContext } from 'playwright';
+
+// 랜덤 User-Agent 목록
+const USER_AGENTS = [
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15',
+];
+
+function getRandomUserAgent(): string {
+  return USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
+}
+
+function randomDelay(min: number, max: number): Promise<void> {
+  const delay = Math.floor(Math.random() * (max - min + 1) + min);
+  return new Promise(resolve => setTimeout(resolve, delay));
+}
 
 export interface CrawledProduct {
   id: string;
@@ -35,6 +52,7 @@ export interface CrawlResult {
 
 export class CoupangCrawler {
   private browser: Browser | null = null;
+  private context: BrowserContext | null = null;
   private page: Page | null = null;
   private isInitialized = false;
 
@@ -42,6 +60,8 @@ export class CoupangCrawler {
     if (this.isInitialized) return;
 
     try {
+      const userAgent = getRandomUserAgent();
+
       this.browser = await chromium.launch({
         headless: true,
         args: [
@@ -49,27 +69,70 @@ export class CoupangCrawler {
           '--disable-setuid-sandbox',
           '--disable-dev-shm-usage',
           '--disable-blink-features=AutomationControlled',
+          '--disable-features=IsolateOrigins,site-per-process',
+          '--disable-accelerated-2d-canvas',
+          '--no-first-run',
+          '--no-zygote',
+          '--disable-gpu',
         ],
       });
 
-      const context = await this.browser.newContext({
-        userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+      this.context = await this.browser.newContext({
+        userAgent,
         viewport: { width: 1920, height: 1080 },
         locale: 'ko-KR',
         timezoneId: 'Asia/Seoul',
+        geolocation: { latitude: 37.5665, longitude: 126.978 },
+        permissions: ['geolocation'],
+        extraHTTPHeaders: {
+          'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+          'Accept-Encoding': 'gzip, deflate, br',
+          'sec-ch-ua': '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
+          'sec-ch-ua-mobile': '?0',
+          'sec-ch-ua-platform': '"macOS"',
+          'Upgrade-Insecure-Requests': '1',
+        },
       });
 
-      this.page = await context.newPage();
+      this.page = await this.context.newPage();
 
-      // 봇 탐지 우회
+      // 강화된 Stealth 설정
       await this.page.addInitScript(() => {
+        // navigator.webdriver 숨기기
         Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-        // @ts-ignore
-        window.chrome = { runtime: {} };
+
+        // Chrome 속성 추가
+        (window as any).chrome = { runtime: {} };
+
+        // Permissions API 수정
+        const originalQuery = window.navigator.permissions.query;
+        window.navigator.permissions.query = (parameters: any) =>
+          parameters.name === 'notifications'
+            ? Promise.resolve({ state: 'denied' } as PermissionStatus)
+            : originalQuery(parameters);
+
+        // Plugin 배열 수정
+        Object.defineProperty(navigator, 'plugins', {
+          get: () => [1, 2, 3, 4, 5],
+        });
+
+        // Languages 설정
+        Object.defineProperty(navigator, 'languages', {
+          get: () => ['ko-KR', 'ko', 'en-US', 'en'],
+        });
+
+        // WebGL 정보 수정
+        const getParameter = WebGLRenderingContext.prototype.getParameter;
+        WebGLRenderingContext.prototype.getParameter = function(parameter) {
+          if (parameter === 37445) return 'Intel Inc.';
+          if (parameter === 37446) return 'Intel Iris OpenGL Engine';
+          return getParameter.call(this, parameter);
+        };
       });
 
       this.isInitialized = true;
-      console.log('[CoupangCrawler] 브라우저 초기화 완료');
+      console.log('[CoupangCrawler] Stealth 모드 브라우저 초기화 완료');
     } catch (error) {
       console.error('[CoupangCrawler] 브라우저 초기화 실패:', error);
       throw error;
@@ -96,19 +159,37 @@ export class CoupangCrawler {
     }
 
     try {
-      const searchUrl = `https://www.coupang.com/np/search?component=&q=${encodeURIComponent(keyword)}&channel=user&page=${page}`;
-      console.log(`[CoupangCrawler] URL: ${searchUrl}`);
-
-      // 페이지 이동
-      const response = await this.page!.goto(searchUrl, {
+      // 1. 먼저 쿠팡 메인 페이지 방문하여 쿠키 획득
+      console.log('[CoupangCrawler] 메인 페이지 방문 중...');
+      await this.page!.goto('https://www.coupang.com', {
         waitUntil: 'domcontentloaded',
         timeout: 30000,
       });
+      await randomDelay(2000, 4000);
 
-      console.log(`[CoupangCrawler] 응답 상태: ${response?.status()}`);
+      // 2. 검색창을 통해 검색 (더 자연스러운 방식)
+      console.log(`[CoupangCrawler] 검색어 입력: ${keyword}`);
+      const searchInput = await this.page!.$('input.search-input, input[name="q"], #headerSearchKeyword');
 
-      // 충분한 대기 시간
-      await this.page!.waitForTimeout(3000);
+      if (searchInput) {
+        await searchInput.click();
+        await randomDelay(300, 600);
+        await searchInput.fill(keyword);
+        await randomDelay(500, 1000);
+        await this.page!.keyboard.press('Enter');
+        await randomDelay(3000, 5000);
+      } else {
+        // 검색창을 못 찾으면 URL로 직접 이동
+        const searchUrl = `https://www.coupang.com/np/search?component=&q=${encodeURIComponent(keyword)}&channel=user&page=${page}`;
+        console.log(`[CoupangCrawler] URL로 직접 이동: ${searchUrl}`);
+        await this.page!.goto(searchUrl, {
+          waitUntil: 'domcontentloaded',
+          timeout: 30000,
+        });
+        await randomDelay(3000, 5000);
+      }
+
+      console.log(`[CoupangCrawler] 현재 URL: ${this.page!.url()}`);
 
       // HTML 구조 디버깅
       const debugInfo = await this.page!.evaluate(() => {
