@@ -60,7 +60,7 @@ function SuccessContent() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="bg-white p-8 rounded-2xl shadow-xl text-center max-w-md">
-          <Loader2 size={48} className="animate-spin text-blue-600 mx-auto mb-4" />
+          <Loader2 size={48} className="animate-spin text-[var(--color-gray-500)] mx-auto mb-4" />
           <h1 className="text-xl font-semibold text-gray-900 mb-2">결제 처리 중</h1>
           <p className="text-gray-600">잠시만 기다려주세요...</p>
         </div>
@@ -72,14 +72,14 @@ function SuccessContent() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="bg-white p-8 rounded-2xl shadow-xl text-center max-w-md">
-          <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
+          <div className="w-16 h-16 rounded-full bg-amber-50 flex items-center justify-center mx-auto mb-4">
             <span className="text-4xl">😢</span>
           </div>
           <h1 className="text-xl font-semibold text-gray-900 mb-2">결제 실패</h1>
           <p className="text-gray-600 mb-6">{error}</p>
           <Link
             href="/settings/billing"
-            className="inline-block px-6 py-3 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700"
+            className="inline-block px-6 py-3 bg-[var(--color-gray-900)] text-white font-medium rounded-xl hover:bg-[var(--color-gray-800)]"
           >
             다시 시도하기
           </Link>
@@ -91,8 +91,8 @@ function SuccessContent() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="bg-white p-8 rounded-2xl shadow-xl text-center max-w-md">
-        <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
-          <CheckCircle size={40} className="text-green-600" />
+        <div className="w-16 h-16 rounded-full bg-emerald-50 flex items-center justify-center mx-auto mb-4">
+          <CheckCircle size={40} className="text-emerald-600" />
         </div>
         <h1 className="text-xl font-semibold text-gray-900 mb-2">결제 완료!</h1>
         <p className="text-gray-600 mb-6">
@@ -101,7 +101,7 @@ function SuccessContent() {
         </p>
         <Link
           href="/"
-          className="inline-block px-6 py-3 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700"
+          className="inline-block px-6 py-3 bg-[var(--color-gray-900)] text-white font-medium rounded-xl hover:bg-[var(--color-gray-800)]"
         >
           대시보드로 이동
         </Link>
@@ -115,7 +115,7 @@ export default function SuccessPage() {
     <Suspense fallback={
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="bg-white p-8 rounded-2xl shadow-xl text-center max-w-md">
-          <Loader2 size={48} className="animate-spin text-blue-600 mx-auto mb-4" />
+          <Loader2 size={48} className="animate-spin text-[var(--color-gray-500)] mx-auto mb-4" />
           <h1 className="text-xl font-semibold text-gray-900 mb-2">로딩 중</h1>
         </div>
       </div>

@@ -32,9 +32,9 @@ const statusConfig: Record<string, { label: string; variant: 'pending' | 'proces
 
 // 취소 유형 매핑
 const cancelTypeConfig: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
-  CANCEL: { label: '주문취소', icon: <XCircle size={14} />, color: 'text-red-600 bg-red-50' },
-  RETURN: { label: '반품', icon: <RotateCcw size={14} />, color: 'text-orange-600 bg-orange-50' },
-  EXCHANGE: { label: '교환', icon: <ArrowLeftRight size={14} />, color: 'text-blue-600 bg-blue-50' },
+  CANCEL: { label: '주문취소', icon: <XCircle size={14} />, color: 'text-[var(--color-gray-600)] bg-[var(--color-gray-50)]' },
+  RETURN: { label: '반품', icon: <RotateCcw size={14} />, color: 'text-amber-600 bg-amber-50' },
+  EXCHANGE: { label: '교환', icon: <ArrowLeftRight size={14} />, color: 'text-[var(--color-gray-600)] bg-[var(--color-gray-50)]' },
 };
 
 // 취소 사유 매핑
@@ -284,7 +284,7 @@ export default function ReturnsPage() {
       {/* 연결 상태 */}
       <div className="flex items-center mb-4">
         {isConnected ? (
-          <div className="flex items-center gap-2 text-green-600">
+          <div className="flex items-center gap-2 text-emerald-600">
             <Wifi size={16} />
             <span className="text-sm">쿠팡 API 연결됨</span>
           </div>
@@ -298,7 +298,7 @@ export default function ReturnsPage() {
 
       {/* 에러 메시지 */}
       {error && (
-        <div className="p-4 mb-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+        <div className="p-4 mb-4 bg-amber-50 border border-amber-200 rounded-lg text-amber-700 text-sm">
           {error}
         </div>
       )}
@@ -469,18 +469,18 @@ export default function ReturnsPage() {
               </div>
 
               {/* 사유 */}
-              <div className="bg-orange-50 rounded-lg p-4">
-                <h3 className="font-medium mb-3 text-orange-800">취소/반품 사유</h3>
+              <div className="bg-amber-50 rounded-lg p-4">
+                <h3 className="font-medium mb-3 text-amber-800">취소/반품 사유</h3>
                 <div className="text-sm space-y-2">
                   <div>
-                    <span className="text-orange-600">사유 유형</span>
-                    <p className="font-medium text-orange-900">
+                    <span className="text-amber-600">사유 유형</span>
+                    <p className="font-medium text-amber-900">
                       {cancelReasonLabels[selectedDetail.cancelReason] || selectedDetail.cancelReason}
                     </p>
                   </div>
                   <div>
-                    <span className="text-orange-600">상세 내용</span>
-                    <p className="text-orange-900">{selectedDetail.cancelReasonDetail || '-'}</p>
+                    <span className="text-amber-600">상세 내용</span>
+                    <p className="text-amber-900">{selectedDetail.cancelReasonDetail || '-'}</p>
                   </div>
                 </div>
               </div>

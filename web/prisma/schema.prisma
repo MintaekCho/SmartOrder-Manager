@@ -20,8 +20,24 @@ model User {
   image          String?
   telegramChatId String?
 
-  // 설정 (JSON)
+  // 사용자 역할 (관리자/직원/고객)
+  role           UserRole   @default(CUSTOMER)
+
+  // 시스템 모드 설정
+  systemMode     SystemMode @default(DROPSHIPPING)
+
+  // 설정 (JSON) - 기능별 활성화 등
   settings       Json      @default("{}")
+
+  // 자사몰 고객용 필드
+  providerId     String?   @unique  // OAuth provider_providerAccountId 조합
+  password       String?             // 일반 로그인용 (미사용)
+  phone          String?
+  point          Int       @default(0)
+  marketingEmail Boolean   @default(false)
+  marketingSms   Boolean   @default(false)
+  lastLoginAt    DateTime?
+  status         UserStatus @default(ACTIVE)
 
   // NextAuth 관계
   accounts       Account[]
@@ -34,10 +50,43 @@ model User {
   products       Product[]
   orders         Order[]
 
+  // 재고 관리 관계
+  warehouses     Warehouse[]
+  inventoryItems InventoryItem[]
+  stockMovements StockMovement[]
+  stockCounts    StockCount[]
+
+  // 자사몰 관계
+  reviews        Review[]
+  wishlists      Wishlist[]
+  addresses      Address[]
+  cartItems      CartItem[]
+
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
   @@map("users")
+}
+
+// 사용자 상태
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  WITHDRAWN
+}
+
+// 시스템 사용 모드
+enum SystemMode {
+  DROPSHIPPING  // 위탁판매 (무재고)
+  INVENTORY     // 재고 관리
+  HYBRID        // 통합 (위탁 + 재고)
+}
+
+// 사용자 역할
+enum UserRole {
+  ADMIN     // 관리자 (전체 권한)
+  STAFF     // 직원 (제한된 관리 권한)
+  CUSTOMER  // 일반 고객 (자사몰 전용)
 }
 
 model Account {
@@ -652,4 +701,624 @@ model NaverTrend {
   @@unique([keyword, startDate, endDate])
   @@index([keyword])
   @@map("naver_trends")
+}
+
+// ============================================
+// 창고 관리 (재고 관리 모드)
+// ============================================
+
+model Warehouse {
+  id          String   @id @default(cuid())
+
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name        String
+  code        String   // 창고 코드 (예: WH001)
+  address     String?
+  description String?
+
+  // 창고 유형
+  type        WarehouseType @default(MAIN)
+
+  // 상태
+  isActive    Boolean  @default(true)
+
+  // 관계
+  locations   WarehouseLocation[]
+  inventory   InventoryItem[]
+  stockMovements StockMovement[]
+  stockCounts StockCount[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, code])
+  @@map("warehouses")
+}
+
+enum WarehouseType {
+  MAIN        // 메인 창고
+  SUB         // 보조 창고
+  RETURN      // 반품 창고
+  TEMP        // 임시 창고
+}
+
+// 창고 내 위치 (로케이션)
+model WarehouseLocation {
+  id          String    @id @default(cuid())
+
+  warehouseId String
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+
+  // 위치 정보 (예: A-01-02 = A구역 1열 2단)
+  zone        String    // 구역 (A, B, C...)
+  aisle       String?   // 열 (01, 02...)
+  shelf       String?   // 선반/단 (01, 02...)
+  bin         String?   // 빈 (세부 위치)
+
+  // 위치 코드 (자동 생성: zone-aisle-shelf-bin)
+  code        String
+
+  // 위치 특성
+  capacity    Int?      // 수용 가능 수량
+  isActive    Boolean   @default(true)
+
+  // 관계
+  inventory   InventoryItem[]
+
+  @@unique([warehouseId, code])
+  @@map("warehouse_locations")
+}
+
+// ============================================
+// 재고 관리
+// ============================================
+
+model InventoryItem {
+  id              String   @id @default(cuid())
+
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // 창고/위치
+  warehouseId     String
+  warehouse       Warehouse @relation(fields: [warehouseId], references: [id])
+
+  locationId      String?
+  location        WarehouseLocation? @relation(fields: [locationId], references: [id])
+
+  // 상품 정보
+  sku             String   // 재고 관리 코드
+  barcode         String?  // 바코드
+
+  name            String
+  description     String?
+  category        String?
+  brand           String?
+
+  // 이미지
+  imageUrl        String?
+
+  // 가격 정보
+  costPrice       Int      // 원가 (매입가)
+  sellingPrice    Int      // 판매가 (현재 가격)
+  comparePrice    Int?     // 정상가 (할인 전 가격, 세일 표시용)
+
+  // 재고 수량
+  quantity        Int      @default(0)  // 현재 재고
+  reservedQty     Int      @default(0)  // 예약된 수량 (출고 대기)
+  availableQty    Int      @default(0)  // 가용 재고 (quantity - reservedQty)
+
+  // 안전재고 설정
+  safetyStock     Int      @default(0)  // 안전재고 수량
+  reorderPoint    Int      @default(0)  // 재주문점
+  maxStock        Int?     // 최대 재고
+
+  // 단위
+  unit            String   @default("EA") // EA, BOX, SET 등
+
+  // 상태
+  status          InventoryStatus @default(ACTIVE)
+
+  // 관계
+  stockMovements  StockMovement[]
+  countItems      StockCountItem[]
+
+  // 자사몰 옵션 시스템
+  optionGroups    ShopProductOptionGroup[]
+  variants        ShopProductVariant[]
+
+  // 자사몰 노출 설정
+  isShopVisible   Boolean  @default(false)  // 자사몰에 노출 여부
+  shopDescription String?  @db.Text         // 자사몰용 상세 설명
+  shopImages      Json     @default("[]")   // 자사몰용 이미지 배열
+
+  // 메타데이터
+  lastCountedAt   DateTime?  // 마지막 실사일
+  expiryDate      DateTime?  // 유통기한
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([userId, sku])
+  @@index([warehouseId])
+  @@index([status])
+  @@index([quantity])
+  @@index([isShopVisible])
+  @@map("inventory_items")
+}
+
+enum InventoryStatus {
+  ACTIVE        // 활성
+  INACTIVE      // 비활성
+  DISCONTINUED  // 단종
+  OUT_OF_STOCK  // 품절
+}
+
+// ============================================
+// 재고 이동 (입출고)
+// ============================================
+
+model StockMovement {
+  id              String   @id @default(cuid())
+
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // 재고 아이템
+  inventoryId     String
+  inventory       InventoryItem @relation(fields: [inventoryId], references: [id])
+
+  // 창고
+  warehouseId     String
+  warehouse       Warehouse @relation(fields: [warehouseId], references: [id])
+
+  // 이동 유형
+  type            MovementType
+
+  // 수량 (양수: 입고, 음수: 출고)
+  quantity        Int
+  beforeQty       Int      // 이동 전 수량
+  afterQty        Int      // 이동 후 수량
+
+  // 참조 정보
+  referenceType   String?  // ORDER, PURCHASE, ADJUSTMENT, TRANSFER, COUNT
+  referenceId     String?  // 관련 문서 ID
+
+  // 비용
+  unitCost        Int?     // 단위 원가 (입고 시)
+  totalCost       Int?     // 총 비용
+
+  // 메모
+  note            String?
+  reason          String?  // 사유 (조정, 폐기 등의 경우)
+
+  // 처리자
+  processedBy     String?  // 처리자 이름
+
+  createdAt       DateTime @default(now())
+
+  @@index([inventoryId, createdAt])
+  @@index([warehouseId, createdAt])
+  @@index([type])
+  @@map("stock_movements")
+}
+
+enum MovementType {
+  // 입고
+  PURCHASE      // 구매 입고
+  RETURN_IN     // 반품 입고
+  TRANSFER_IN   // 이동 입고 (타 창고에서)
+  ADJUSTMENT_IN // 조정 입고 (재고 조정)
+
+  // 출고
+  SALE          // 판매 출고
+  RETURN_OUT    // 반품 출고 (공급자에게)
+  TRANSFER_OUT  // 이동 출고 (타 창고로)
+  ADJUSTMENT_OUT // 조정 출고 (재고 조정)
+  DISPOSE       // 폐기
+}
+
+// ============================================
+// 재고 실사
+// ============================================
+
+model StockCount {
+  id              String   @id @default(cuid())
+
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // 창고
+  warehouseId     String
+  warehouse       Warehouse @relation(fields: [warehouseId], references: [id])
+
+  // 실사 정보
+  countNumber     String   // 실사 번호 (예: SC-2024-001)
+  countDate       DateTime // 실사 일자
+  countType       StockCountType @default(FULL)
+
+  // 상태
+  status          StockCountStatus @default(DRAFT)
+
+  // 요약
+  totalItems      Int      @default(0)  // 총 품목 수
+  matchedItems    Int      @default(0)  // 일치 품목 수
+  discrepancyItems Int     @default(0)  // 차이 발생 품목 수
+
+  // 메모
+  note            String?
+
+  // 실사 항목
+  items           StockCountItem[]
+
+  // 승인 정보
+  approvedBy      String?
+  approvedAt      DateTime?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([userId, countNumber])
+  @@index([warehouseId, countDate])
+  @@map("stock_counts")
+}
+
+enum StockCountType {
+  FULL      // 전체 실사
+  PARTIAL   // 부분 실사
+  CYCLE     // 순환 실사
+  SPOT      // 임시 실사
+}
+
+enum StockCountStatus {
+  DRAFT       // 작성 중
+  IN_PROGRESS // 진행 중
+  COMPLETED   // 완료
+  APPROVED    // 승인됨
+  CANCELLED   // 취소됨
+}
+
+// 실사 항목
+model StockCountItem {
+  id              String   @id @default(cuid())
+
+  stockCountId    String
+  stockCount      StockCount @relation(fields: [stockCountId], references: [id], onDelete: Cascade)
+
+  inventoryId     String
+  inventory       InventoryItem @relation(fields: [inventoryId], references: [id])
+
+  // 수량
+  systemQty       Int      // 시스템 재고
+  countedQty      Int?     // 실사 수량
+  difference      Int?     // 차이 (countedQty - systemQty)
+
+  // 상태
+  isCounted       Boolean  @default(false)
+  isAdjusted      Boolean  @default(false) // 조정 완료 여부
+
+  // 메모
+  note            String?
+
+  countedAt       DateTime?
+  countedBy       String?
+
+  @@unique([stockCountId, inventoryId])
+  @@map("stock_count_items")
+}
+
+// ============================================
+// 발주 (구매 주문)
+// ============================================
+
+model PurchaseOrder {
+  id              String   @id @default(cuid())
+
+  // 발주 번호
+  orderNumber     String   @unique
+
+  // 공급처
+  supplierId      String?
+  supplierName    String
+  supplierContact String?
+
+  // 상태
+  status          PurchaseOrderStatus @default(DRAFT)
+
+  // 날짜
+  orderDate       DateTime
+  expectedDate    DateTime? // 입고 예정일
+
+  // 금액
+  subtotal        Int       @default(0)
+  tax             Int       @default(0)
+  shippingCost    Int       @default(0)
+  totalAmount     Int       @default(0)
+
+  // 메모
+  note            String?
+
+  // 발주 항목
+  items           PurchaseOrderItem[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([status])
+  @@index([orderDate])
+  @@map("purchase_orders")
+}
+
+enum PurchaseOrderStatus {
+  DRAFT           // 작성 중
+  SUBMITTED       // 제출됨
+  CONFIRMED       // 확인됨
+  PARTIALLY_RECEIVED // 부분 입고
+  RECEIVED        // 입고 완료
+  CANCELLED       // 취소됨
+}
+
+model PurchaseOrderItem {
+  id              String   @id @default(cuid())
+
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+
+  // 상품 정보
+  sku             String
+  name            String
+  unit            String   @default("EA")
+
+  // 수량
+  orderedQty      Int      // 발주 수량
+  receivedQty     Int      @default(0) // 입고된 수량
+
+  // 가격
+  unitPrice       Int
+  totalPrice      Int
+
+  // 메모
+  note            String?
+
+  @@map("purchase_order_items")
+}
+
+
+// ============================================
+// 자사몰 - 상품 옵션 시스템
+// ============================================
+
+// 상품 옵션 그룹 (예: 중량, 등급)
+model ShopProductOptionGroup {
+  id              String   @id @default(cuid())
+
+  // 상품 (InventoryItem 참조)
+  inventoryId     String
+  inventory       InventoryItem @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+
+  // 옵션 그룹 정보
+  name            String   // 예: "중량", "등급", "포장"
+  displayOrder    Int      @default(0) // 표시 순서
+  isRequired      Boolean  @default(true) // 필수 선택 여부
+
+  // 옵션 값들
+  options         ShopProductOption[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([inventoryId])
+  @@map("shop_product_option_groups")
+}
+
+// 상품 옵션 값 (예: 1kg, 3kg, 5kg)
+model ShopProductOption {
+  id              String   @id @default(cuid())
+
+  // 옵션 그룹
+  optionGroupId   String
+  optionGroup     ShopProductOptionGroup @relation(fields: [optionGroupId], references: [id], onDelete: Cascade)
+
+  // 옵션 정보
+  name            String   // 예: "1kg", "3kg", "프리미엄"
+  additionalPrice Int      @default(0) // 추가 금액 (+0, +15000, etc.)
+  displayOrder    Int      @default(0) // 표시 순서
+
+  // 상태
+  isActive        Boolean  @default(true)
+
+  // 변형(Variant)과의 관계
+  variants        ShopProductVariantOption[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("shop_product_options")
+}
+
+// 상품 변형 (옵션 조합별 재고/가격)
+// 예: 사과 1kg 일반, 사과 1kg 프리미엄, 사과 3kg 일반, 사과 3kg 프리미엄
+model ShopProductVariant {
+  id              String   @id @default(cuid())
+
+  // 상품 (InventoryItem 참조)
+  inventoryId     String
+  inventory       InventoryItem @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+
+  // 변형 정보
+  sku             String?  // 변형별 SKU (선택사항)
+  name            String?  // 변형명 (자동 생성 가능: "1kg / 일반")
+
+  // 가격 (기본가 + 옵션 추가금액 = 최종가격)
+  price           Int      // 이 변형의 판매가격
+  comparePrice    Int?     // 비교가격 (할인 전 가격)
+
+  // 재고
+  stock           Int      @default(0)
+  lowStockAlert   Int      @default(5) // 재고 부족 알림 기준
+
+  // 상태
+  isActive        Boolean  @default(true)
+
+  // 이 변형에 포함된 옵션들
+  options         ShopProductVariantOption[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([inventoryId])
+  @@index([isActive])
+  @@map("shop_product_variants")
+}
+
+// 변형-옵션 연결 테이블 (다대다)
+model ShopProductVariantOption {
+  id              String   @id @default(cuid())
+
+  variantId       String
+  variant         ShopProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  optionId        String
+  option          ShopProductOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+
+  @@unique([variantId, optionId])
+  @@map("shop_product_variant_options")
+}
+
+// ============================================
+// 자사몰 - 카테고리 관리
+// ============================================
+
+model ShopCategory {
+  id              String   @id @default(cuid())
+
+  // 카테고리 정보
+  name            String   // 카테고리명
+  slug            String   @unique // URL용 슬러그
+  code            String   @unique // 카테고리 코드 (상품코드 생성용, 예: FRUIT, VEG)
+  description     String?  // 설명
+  imageUrl        String?  // 카테고리 이미지
+
+  // 계층 구조
+  parentId        String?
+  parent          ShopCategory?  @relation("ShopCategoryHierarchy", fields: [parentId], references: [id])
+  children        ShopCategory[] @relation("ShopCategoryHierarchy")
+
+  // 표시 설정
+  displayOrder    Int      @default(0) // 표시 순서
+  isActive        Boolean  @default(true) // 활성화 여부
+  isVisible       Boolean  @default(true) // 쇼핑몰 노출 여부
+
+  // 아이콘 (lucide-react 아이콘명)
+  icon            String?
+
+  // 상품코드 시퀀스 (카테고리별 자동 증가)
+  productSeq      Int      @default(0) // 마지막으로 생성된 상품 번호
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([parentId])
+  @@index([displayOrder])
+  @@map("shop_categories")
+}
+
+// ============================================
+// 자사몰 - 상품 리뷰
+// ============================================
+
+model Review {
+  id           String   @id @default(dbgenerated("(gen_random_uuid())::text")) @db.VarChar(255)
+
+  userId       String   @db.VarChar(255)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  productId    String   @db.VarChar(255) // inventory_items.id
+  orderId      String?  @db.VarChar(255) // 주문번호 (구매 인증용)
+
+  // 리뷰 내용
+  rating       Int      // 1-5 별점
+  content      String?  @db.Text
+  images       Json     @default("[]") // 리뷰 이미지 URL 배열
+
+  // 상태
+  isVerified   Boolean  @default(false) // 구매 인증 여부
+  isVisible    Boolean  @default(true)  // 노출 여부
+
+  // 통계
+  helpfulCount Int      @default(0) // 도움이 됐어요 수
+
+  createdAt    DateTime @default(now()) @db.Timestamp(6)
+  updatedAt    DateTime @default(now()) @db.Timestamp(6)
+
+  @@index([productId])
+  @@index([userId])
+  @@unique([userId, orderId, productId]) // 동일 주문의 동일 상품에 대해 1개의 리뷰만 허용
+  @@map("reviews")
+}
+
+// ============================================
+// 자사몰 찜하기 (위시리스트)
+// ============================================
+
+model Wishlist {
+  id        String   @id @default(dbgenerated("(gen_random_uuid())::text")) @db.VarChar(255)
+  userId    String   @db.VarChar(255)
+  productId String   @db.VarChar(255)
+  createdAt DateTime @default(now()) @db.Timestamp(6)
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@index([userId])
+  @@index([productId])
+  @@map("wishlists")
+}
+
+// ============================================
+// 자사몰 배송지
+// ============================================
+
+model Address {
+  id            String   @id @default(dbgenerated("(gen_random_uuid())::text")) @db.VarChar(255)
+  userId        String   @db.VarChar(255)
+  name          String   @db.VarChar(255)
+  recipientName String   @db.VarChar(255)
+  phone         String   @db.VarChar(50)
+  zipCode       String   @db.VarChar(20)
+  address       String   @db.VarChar(500)
+  addressDetail String?  @db.VarChar(255)
+  isDefault     Boolean  @default(false)
+  createdAt     DateTime @default(now()) @db.Timestamp(6)
+  updatedAt     DateTime @default(now()) @db.Timestamp(6)
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("addresses")
+}
+
+// ============================================
+// 자사몰 장바구니
+// ============================================
+
+model CartItem {
+  id            String   @id @default(dbgenerated("(gen_random_uuid())::text")) @db.VarChar(255)
+  userId        String   @db.VarChar(255)
+  productId     String   @db.VarChar(255)
+  variantId     String   @default("") @db.VarChar(255)
+  productName   String   @db.VarChar(255)
+  productImage  String?  @db.VarChar(255)
+  price         Int
+  originalPrice Int?
+  unit          String?  @db.VarChar(100)
+  quantity      Int      @default(1)
+  createdAt     DateTime @default(now()) @db.Timestamp(6)
+  updatedAt     DateTime @default(now()) @db.Timestamp(6)
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId, variantId])
+  @@map("cart_items")
 }

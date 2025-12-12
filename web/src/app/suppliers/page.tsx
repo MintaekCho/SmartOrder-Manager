@@ -183,9 +183,9 @@ const mockSuppliers: Supplier[] = [
 ];
 
 const typeConfig: Record<SupplierType, { label: string; color: string }> = {
-  B2B: { label: 'B2B 도매', color: 'bg-blue-100 text-blue-700' },
-  PERSONAL: { label: '개인 공급처', color: 'bg-green-100 text-green-700' },
-  MANUFACTURER: { label: '제조/생산', color: 'bg-purple-100 text-purple-700' },
+  B2B: { label: 'B2B 도매', color: 'bg-[var(--color-gray-100)] text-[var(--color-gray-700)]' },
+  PERSONAL: { label: '개인 공급처', color: 'bg-[var(--color-gray-100)] text-[var(--color-gray-700)]' },
+  MANUFACTURER: { label: '제조/생산', color: 'bg-[var(--color-gray-100)] text-[var(--color-gray-700)]' },
 };
 
 const statusConfig: Record<SupplierStatus, { label: string; variant: 'completed' | 'pending' | 'error' }> = {
@@ -228,16 +228,13 @@ export default function SuppliersPage() {
       header: '공급처명',
       render: (item: Supplier) => (
         <div className="flex items-center gap-3">
-          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-            item.type === 'B2B' ? 'bg-blue-100' :
-            item.type === 'PERSONAL' ? 'bg-green-100' : 'bg-purple-100'
-          }`}>
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-[var(--color-gray-100)]">
             {item.type === 'B2B' ? (
-              <Building2 size={20} className="text-blue-600" />
+              <Building2 size={20} className="text-[var(--color-gray-500)]" />
             ) : item.type === 'MANUFACTURER' ? (
-              <Package size={20} className="text-purple-600" />
+              <Package size={20} className="text-[var(--color-gray-500)]" />
             ) : (
-              <User size={20} className="text-green-600" />
+              <User size={20} className="text-[var(--color-gray-500)]" />
             )}
           </div>
           <div>
@@ -298,7 +295,7 @@ export default function SuppliersPage() {
       render: (item: Supplier) => (
         <div className="text-sm">
           <div className="flex items-center gap-1">
-            <Star size={14} className="text-yellow-400 fill-yellow-400" />
+            <Star size={14} className="text-amber-400 fill-amber-400" />
             <span className="font-medium">{item.rating}</span>
           </div>
           <p className="text-[var(--color-gray-500)]">
@@ -334,7 +331,7 @@ export default function SuppliersPage() {
             <Edit2 size={16} />
           </Button>
           <Button variant="ghost" size="sm">
-            <Trash2 size={16} className="text-red-500" />
+            <Trash2 size={16} className="text-[var(--color-gray-400)]" />
           </Button>
         </div>
       ),
@@ -365,36 +362,36 @@ export default function SuppliersPage() {
 
         <Card className="p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <CheckCircle size={20} className="text-green-600" />
+            <div className="p-2 bg-emerald-50 rounded-lg">
+              <CheckCircle size={20} className="text-emerald-600" />
             </div>
             <div>
               <p className="text-sm text-[var(--color-gray-500)]">거래중</p>
-              <p className="text-2xl font-bold text-green-600">{stats.active}</p>
+              <p className="text-2xl font-bold text-emerald-600">{stats.active}</p>
             </div>
           </div>
         </Card>
 
         <Card className="p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <Building2 size={20} className="text-blue-600" />
+            <div className="p-2 bg-[var(--color-gray-100)] rounded-lg">
+              <Building2 size={20} className="text-[var(--color-gray-500)]" />
             </div>
             <div>
               <p className="text-sm text-[var(--color-gray-500)]">B2B 도매</p>
-              <p className="text-2xl font-bold text-blue-600">{stats.b2b}</p>
+              <p className="text-2xl font-bold text-[var(--color-gray-900)]">{stats.b2b}</p>
             </div>
           </div>
         </Card>
 
         <Card className="p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <User size={20} className="text-green-600" />
+            <div className="p-2 bg-[var(--color-gray-100)] rounded-lg">
+              <User size={20} className="text-[var(--color-gray-500)]" />
             </div>
             <div>
               <p className="text-sm text-[var(--color-gray-500)]">개인 공급처</p>
-              <p className="text-2xl font-bold text-green-600">{stats.personal}</p>
+              <p className="text-2xl font-bold text-[var(--color-gray-900)]">{stats.personal}</p>
             </div>
           </div>
         </Card>

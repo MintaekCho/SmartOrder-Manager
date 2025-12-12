@@ -16,15 +16,17 @@ interface DataTableProps<T> {
   actions?: ReactNode;
   emptyMessage?: string;
   onRowClick?: (item: T) => void;
+  keyExtractor?: (item: T, index: number) => string | number;
 }
 
-export default function DataTable<T extends { id: string | number }>({
+export default function DataTable<T>({
   columns,
   data,
   title,
   actions,
   emptyMessage = '데이터가 없습니다.',
   onRowClick,
+  keyExtractor = (item: T) => (item as any).id ?? Math.random(),
 }: DataTableProps<T>) {
   return (
     <div className="card overflow-hidden">
@@ -63,9 +65,9 @@ export default function DataTable<T extends { id: string | number }>({
                 </td>
               </tr>
             ) : (
-              data.map((item) => (
+              data.map((item, index) => (
                 <tr
-                  key={item.id}
+                  key={keyExtractor(item, index)}
                   onClick={() => onRowClick?.(item)}
                   className={`hover:bg-[var(--color-gray-50)] ${
                     onRowClick ? 'cursor-pointer' : ''

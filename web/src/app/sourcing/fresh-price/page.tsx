@@ -8,7 +8,6 @@ import {
   TrendingUp,
   TrendingDown,
   Minus,
-  Calendar,
   RefreshCw,
   AlertCircle,
   Info,
@@ -33,12 +32,11 @@ const priceTypeOptions = [
   { value: '02', label: '도매가격' },
 ];
 
-// 제철 과일 (12월)
-const seasonalItems = ['귤', '사과', '딸기', '한라봉'];
 
 interface PriceItem {
   itemName: string;
   kindName: string;
+  rank: string; // 등급: 상품, 중품
   unit: string;
   price: string;
   direction: string;
@@ -111,16 +109,16 @@ export default function FreshPricePage() {
 
   const getDirectionIcon = (direction: string) => {
     if (direction === '1') {
-      return <TrendingUp size={16} className="text-red-500" />;
+      return <TrendingUp size={16} className="text-amber-500" />;
     } else if (direction === '-1') {
-      return <TrendingDown size={16} className="text-blue-500" />;
+      return <TrendingDown size={16} className="text-emerald-500" />;
     }
     return <Minus size={16} className="text-gray-400" />;
   };
 
   const getDirectionColor = (direction: string) => {
-    if (direction === '1') return 'text-red-600';
-    if (direction === '-1') return 'text-blue-600';
+    if (direction === '1') return 'text-amber-600';
+    if (direction === '-1') return 'text-emerald-600';
     return 'text-gray-600';
   };
 
@@ -139,28 +137,6 @@ export default function FreshPricePage() {
         { name: '농수산물 시세' },
       ]}
     >
-      {/* 제철 과일 배너 */}
-      <Card className="mb-6 bg-gradient-to-r from-[#E8F5E9] to-[#C8E6C9]">
-        <div className="flex items-center gap-4">
-          <div className="p-3 bg-white/80 rounded-xl">
-            <Calendar size={24} className="text-[var(--color-success)]" />
-          </div>
-          <div>
-            <h3 className="font-semibold text-[#2E7D32]">12월 제철 과일</h3>
-            <div className="flex gap-2 mt-1">
-              {seasonalItems.map((item) => (
-                <span
-                  key={item}
-                  className="px-3 py-1 bg-white/80 rounded-full text-sm font-medium text-[#2E7D32]"
-                >
-                  {item}
-                </span>
-              ))}
-            </div>
-          </div>
-        </div>
-      </Card>
-
       {/* 필터 */}
       <Card className="mb-6">
         <div className="flex flex-wrap gap-4 items-center">
@@ -171,7 +147,7 @@ export default function FreshPricePage() {
                 onClick={() => setCategory(cat.value)}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                   category === cat.value
-                    ? 'bg-green-600 text-white'
+                    ? 'bg-[var(--color-gray-900)] text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
@@ -195,7 +171,7 @@ export default function FreshPricePage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="품목 검색..."
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-500)]"
             />
           </div>
           <Button onClick={fetchPrices} disabled={state.loading}>
@@ -211,15 +187,15 @@ export default function FreshPricePage() {
 
       {/* API 미설정 안내 */}
       {state.apiNotConfigured && (
-        <Card className="mb-6 bg-yellow-50 border-yellow-200">
+        <Card className="mb-6 bg-amber-50 border-amber-200">
           <div className="flex items-start gap-3">
-            <Info className="text-yellow-500 flex-shrink-0 mt-0.5" size={20} />
+            <Info className="text-amber-500 flex-shrink-0 mt-0.5" size={20} />
             <div>
-              <p className="font-medium text-yellow-700">KAMIS API 미설정</p>
-              <p className="text-sm text-yellow-600 mt-1">
+              <p className="font-medium text-amber-700">KAMIS API 미설정</p>
+              <p className="text-sm text-amber-600 mt-1">
                 농수산물 시세 데이터를 조회하려면 KAMIS API 키를 설정해야 합니다.
               </p>
-              <div className="mt-2 p-2 bg-yellow-100 rounded text-xs font-mono text-yellow-700">
+              <div className="mt-2 p-2 bg-amber-100 rounded text-xs font-mono text-amber-700">
                 KAMIS_API_KEY=your_api_key<br/>
                 KAMIS_CERT_ID=your_cert_id
               </div>
@@ -227,7 +203,7 @@ export default function FreshPricePage() {
                 href="https://www.kamis.or.kr/customer/reference/openapi_list.do"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-block mt-2 text-sm text-yellow-600 hover:text-yellow-800 underline"
+                className="inline-block mt-2 text-sm text-amber-600 hover:text-amber-800 underline"
               >
                 KAMIS Open API 신청하기
               </a>
@@ -238,12 +214,12 @@ export default function FreshPricePage() {
 
       {/* 에러 메시지 */}
       {state.error && !state.apiNotConfigured && (
-        <Card className="mb-6 bg-red-50 border-red-200">
+        <Card className="mb-6 bg-amber-50 border-amber-200">
           <div className="flex items-start gap-3">
-            <AlertCircle className="text-red-500 flex-shrink-0 mt-0.5" size={20} />
+            <AlertCircle className="text-amber-500 flex-shrink-0 mt-0.5" size={20} />
             <div>
-              <p className="font-medium text-red-700">시세 조회 실패</p>
-              <p className="text-sm text-red-600 mt-1">{state.error}</p>
+              <p className="font-medium text-amber-700">시세 조회 실패</p>
+              <p className="text-sm text-amber-600 mt-1">{state.error}</p>
             </div>
           </div>
         </Card>
@@ -253,7 +229,7 @@ export default function FreshPricePage() {
       {state.loading && (
         <Card>
           <div className="text-center py-12">
-            <RefreshCw className="mx-auto text-green-500 mb-4 animate-spin" size={48} />
+            <RefreshCw className="mx-auto text-[var(--color-gray-500)] mb-4 animate-spin" size={48} />
             <h3 className="text-xl font-semibold text-gray-700 mb-2">
               시세 정보를 불러오는 중...
             </h3>
@@ -284,6 +260,7 @@ export default function FreshPricePage() {
                   <tr className="border-b border-gray-200">
                     <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">품목</th>
                     <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">품종</th>
+                    <th className="text-center py-3 px-4 text-sm font-medium text-gray-500">등급</th>
                     <th className="text-center py-3 px-4 text-sm font-medium text-gray-500">단위</th>
                     <th className="text-right py-3 px-4 text-sm font-medium text-gray-500">가격</th>
                     <th className="text-right py-3 px-4 text-sm font-medium text-gray-500">등락</th>
@@ -298,13 +275,24 @@ export default function FreshPricePage() {
                       <td className="py-3 px-4 text-sm text-gray-600">
                         {item.kindName || '-'}
                       </td>
+                      <td className="py-3 px-4 text-center">
+                        {item.rank ? (
+                          <span className={`px-2 py-0.5 text-xs font-medium rounded ${
+                            item.rank === '상품'
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : 'bg-gray-100 text-gray-600'
+                          }`}>
+                            {item.rank}
+                          </span>
+                        ) : '-'}
+                      </td>
                       <td className="py-3 px-4 text-center text-sm text-gray-500">
                         {item.unit || '-'}
                       </td>
                       <td className="py-3 px-4 text-right">
                         <span className="font-bold text-gray-900">
                           {item.price && item.price !== '-'
-                            ? `${parseInt(item.price).toLocaleString()}원`
+                            ? `${parseInt(item.price.replace(/,/g, '')).toLocaleString()}원`
                             : '-'}
                         </span>
                       </td>
@@ -331,16 +319,16 @@ export default function FreshPricePage() {
       )}
 
       {/* API 설정 안내 */}
-      <Card className="mt-6 bg-blue-50 border-blue-200">
+      <Card className="mt-6 bg-[var(--color-gray-50)] border-[var(--color-gray-200)]">
         <div className="flex items-start gap-3">
-          <Info className="text-blue-500 flex-shrink-0 mt-0.5" size={20} />
+          <Info className="text-[var(--color-gray-500)] flex-shrink-0 mt-0.5" size={20} />
           <div>
-            <p className="font-medium text-blue-700">KAMIS 농산물유통정보 API</p>
-            <p className="text-sm text-blue-600 mt-1">
+            <p className="font-medium text-[var(--color-gray-700)]">KAMIS 농산물유통정보 API</p>
+            <p className="text-sm text-[var(--color-gray-600)] mt-1">
               한국농수산식품유통공사(aT)에서 제공하는 공식 농수산물 도소매 가격정보 API입니다.
               정확한 시세 정보를 위해 API 키를 발급받아 사용하세요.
             </p>
-            <ul className="mt-2 text-sm text-blue-600 space-y-1">
+            <ul className="mt-2 text-sm text-[var(--color-gray-600)] space-y-1">
               <li>- 도매가격 65품목, 소매가격 82품목 제공</li>
               <li>- 일일 거래 동향 및 등락률 정보</li>
               <li>- 무료 이용 가능</li>
@@ -349,7 +337,7 @@ export default function FreshPricePage() {
               href="https://www.kamis.or.kr/customer/reference/openapi_list.do"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-block mt-2 text-sm text-blue-600 hover:text-blue-800 underline"
+              className="inline-block mt-2 text-sm text-[var(--color-gray-600)] hover:text-[var(--color-gray-800)] underline"
             >
               KAMIS Open API 바로가기
             </a>

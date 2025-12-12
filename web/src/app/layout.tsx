@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import SessionProvider from "@/components/providers/SessionProvider";
+import { SystemModeProvider } from "@/contexts/SystemModeContext";
+import PageLoadingProvider from "@/components/providers/PageLoadingProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -14,8 +16,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "CoupangAuto - 쿠팡 판매 자동화 솔루션",
-  description: "쿠팡 상품 소싱, 등록, 주문 관리를 자동화하는 SaaS 솔루션",
+  title: "SmartOrder Manager - 스마트 주문 관리 솔루션",
+  description: "위탁판매, 재고관리를 지원하는 통합 주문 관리 솔루션",
 };
 
 export default function RootLayout({
@@ -28,8 +30,11 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <PageLoadingProvider />
         <SessionProvider>
-          {children}
+          <SystemModeProvider>
+            {children}
+          </SystemModeProvider>
         </SessionProvider>
       </body>
     </html>

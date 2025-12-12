@@ -17,6 +17,7 @@ export const maxDuration = 30;
 interface KamisPriceItem {
   itemName: string;
   kindName: string;
+  rank: string; // 등급: 상품, 중품 등
   unit: string;
   price: string;
   direction: string; // 1: 상승, -1: 하락, 0: 보합
@@ -114,6 +115,7 @@ export async function GET(request: NextRequest) {
       const priceList: KamisPriceItem[] = items.map((item: any) => ({
         itemName: item.item_name || '',
         kindName: item.kind_name || '',
+        rank: item.rank || '', // 등급: 상품, 중품
         unit: item.unit || '',
         price: item.dpr1 || '0', // 당일 가격
         direction: item.direction || '0',

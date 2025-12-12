@@ -284,7 +284,7 @@ export default function OrdersPage() {
       {/* 연결 상태 */}
       <div className="flex items-center mb-4">
         {isConnected ? (
-          <div className="flex items-center gap-2 text-green-600">
+          <div className="flex items-center gap-2 text-emerald-600">
             <Wifi size={16} />
             <span className="text-sm">쿠팡 API 연결됨</span>
           </div>
@@ -298,7 +298,7 @@ export default function OrdersPage() {
 
       {/* 에러 메시지 */}
       {error && (
-        <div className="p-4 mb-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+        <div className="p-4 mb-4 bg-amber-50 border border-amber-200 rounded-lg text-amber-700 text-sm">
           {error}
         </div>
       )}

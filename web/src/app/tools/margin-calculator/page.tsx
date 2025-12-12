@@ -110,8 +110,8 @@ export default function MarginCalculatorPage() {
         <div className="mb-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center">
-                <Calculator className="text-green-600" size={24} />
+              <div className="w-10 h-10 bg-[var(--color-gray-100)] rounded-xl flex items-center justify-center">
+                <Calculator className="text-[var(--color-gray-600)]" size={24} />
               </div>
               <div>
                 <h1 className="text-xl font-bold text-[var(--color-gray-900)]">마진 계산기</h1>
@@ -257,12 +257,12 @@ export default function MarginCalculatorPage() {
           {/* 결과 섹션 */}
           <div className="space-y-6">
             {/* 권장 판매가 */}
-            <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border border-green-200 p-6">
+            <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-xl border border-emerald-200 p-6">
               <h2 className="text-lg font-semibold text-[var(--color-gray-900)] mb-4">권장 판매가</h2>
 
               {calculation.error ? (
                 <div className="text-center py-8">
-                  <p className="text-red-500 font-medium">{calculation.error}</p>
+                  <p className="text-amber-600 font-medium">{calculation.error}</p>
                   <p className="text-sm text-[var(--color-gray-500)] mt-2">마진율이나 수수료율을 조정해주세요</p>
                 </div>
               ) : (
@@ -270,36 +270,36 @@ export default function MarginCalculatorPage() {
                   <div className="text-center mb-6">
                     <p className="text-sm text-[var(--color-gray-600)] mb-1">이 가격으로 판매하세요</p>
                     <div className="flex items-center justify-center gap-2">
-                      <span className="text-4xl font-bold text-green-600">
+                      <span className="text-4xl font-bold text-emerald-600">
                         {calculation.sellingPrice.toLocaleString()}
                       </span>
                       <span className="text-xl text-[var(--color-gray-600)]">원</span>
                       <button
                         onClick={() => handleCopy(calculation.sellingPrice)}
-                        className="p-2 hover:bg-green-100 rounded-lg transition-colors"
+                        className="p-2 hover:bg-emerald-100 rounded-lg transition-colors"
                         title="복사"
                       >
-                        {copied ? <Check size={18} className="text-green-600" /> : <Copy size={18} className="text-[var(--color-gray-500)]" />}
+                        {copied ? <Check size={18} className="text-emerald-600" /> : <Copy size={18} className="text-[var(--color-gray-500)]" />}
                       </button>
                     </div>
                   </div>
 
                   <div className="space-y-3">
-                    <div className="flex justify-between items-center py-2 border-b border-green-200">
+                    <div className="flex justify-between items-center py-2 border-b border-emerald-200">
                       <span className="text-[var(--color-gray-600)]">총 원가</span>
                       <span className="font-medium">{calculation.totalCost.toLocaleString()}원</span>
                     </div>
-                    <div className="flex justify-between items-center py-2 border-b border-green-200">
+                    <div className="flex justify-between items-center py-2 border-b border-emerald-200">
                       <span className="text-[var(--color-gray-600)]">수수료 ({commissionRate}%)</span>
-                      <span className="font-medium text-red-500">-{calculation.commissionAmount.toLocaleString()}원</span>
+                      <span className="font-medium text-[var(--color-gray-500)]">-{calculation.commissionAmount.toLocaleString()}원</span>
                     </div>
                     <div className="flex justify-between items-center py-2">
                       <span className="text-[var(--color-gray-700)] font-medium">예상 순이익</span>
-                      <span className="text-xl font-bold text-green-600">+{calculation.profit.toLocaleString()}원</span>
+                      <span className="text-xl font-bold text-emerald-600">+{calculation.profit.toLocaleString()}원</span>
                     </div>
-                    <div className="flex justify-between items-center py-2 bg-green-100 rounded-lg px-3 -mx-3">
+                    <div className="flex justify-between items-center py-2 bg-emerald-100 rounded-lg px-3 -mx-3">
                       <span className="text-[var(--color-gray-700)] font-medium">실제 마진율</span>
-                      <span className="text-lg font-bold text-green-700">{calculation.actualMarginRate?.toFixed(1)}%</span>
+                      <span className="text-lg font-bold text-emerald-700">{calculation.actualMarginRate?.toFixed(1)}%</span>
                     </div>
                   </div>
                 </>
@@ -336,22 +336,22 @@ export default function MarginCalculatorPage() {
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-[var(--color-gray-200)]">
                   <span className="text-[var(--color-gray-600)]">수수료</span>
-                  <span className="text-red-500">-{reverseCalculation.commissionAmount.toLocaleString()}원</span>
+                  <span className="text-[var(--color-gray-500)]">-{reverseCalculation.commissionAmount.toLocaleString()}원</span>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-[var(--color-gray-200)]">
                   <span className="text-[var(--color-gray-700)] font-medium">순이익</span>
-                  <span className={`font-bold ${reverseCalculation.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  <span className={`font-bold ${reverseCalculation.profit >= 0 ? 'text-emerald-600' : 'text-amber-600'}`}>
                     {reverseCalculation.profit >= 0 ? '+' : ''}{reverseCalculation.profit.toLocaleString()}원
                   </span>
                 </div>
                 <div className={`flex justify-between items-center py-2 px-3 -mx-3 rounded-lg ${
-                  reverseCalculation.marginRate >= 20 ? 'bg-green-100' :
-                  reverseCalculation.marginRate >= 10 ? 'bg-yellow-100' : 'bg-red-100'
+                  reverseCalculation.marginRate >= 20 ? 'bg-emerald-100' :
+                  reverseCalculation.marginRate >= 10 ? 'bg-[var(--color-gray-100)]' : 'bg-amber-100'
                 }`}>
                   <span className="text-[var(--color-gray-700)] font-medium">마진율</span>
                   <span className={`font-bold ${
-                    reverseCalculation.marginRate >= 20 ? 'text-green-700' :
-                    reverseCalculation.marginRate >= 10 ? 'text-yellow-700' : 'text-red-700'
+                    reverseCalculation.marginRate >= 20 ? 'text-emerald-700' :
+                    reverseCalculation.marginRate >= 10 ? 'text-[var(--color-gray-700)]' : 'text-amber-700'
                   }`}>
                     {reverseCalculation.marginRate.toFixed(1)}%
                   </span>
@@ -360,12 +360,12 @@ export default function MarginCalculatorPage() {
             </div>
 
             {/* 안내 */}
-            <div className="bg-blue-50 rounded-xl border border-blue-200 p-4">
+            <div className="bg-[var(--color-gray-50)] rounded-xl border border-[var(--color-gray-200)] p-4">
               <div className="flex gap-3">
-                <Info size={20} className="text-blue-600 flex-shrink-0 mt-0.5" />
-                <div className="text-sm text-blue-800">
+                <Info size={20} className="text-[var(--color-gray-600)] flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-[var(--color-gray-800)]">
                   <p className="font-medium mb-1">마진 계산 공식</p>
-                  <p className="text-blue-700">
+                  <p className="text-[var(--color-gray-700)]">
                     판매가 = 총원가 ÷ (1 - 수수료율 - 마진율)<br/>
                     순이익 = 판매가 - 총원가 - 수수료
                   </p>

@@ -252,7 +252,7 @@ export default function SettlementsPage() {
       header: '수수료',
       width: '100px',
       render: (item: SettlementItem) => (
-        <span className="text-right text-red-600">-{item.commission.toLocaleString()}원</span>
+        <span className="text-right text-[var(--color-gray-600)]">-{item.commission.toLocaleString()}원</span>
       ),
     },
     {
@@ -277,7 +277,7 @@ export default function SettlementsPage() {
     >
       {/* 에러 메시지 */}
       {error && (
-        <div className="p-4 mb-4 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-700 text-sm">
+        <div className="p-4 mb-4 bg-amber-50 border border-amber-200 rounded-lg text-amber-700 text-sm">
           {error} (Mock 데이터로 표시 중)
         </div>
       )}
@@ -336,8 +336,8 @@ export default function SettlementsPage() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <Card className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <DollarSign size={20} className="text-blue-600" />
+              <div className="p-2 bg-[var(--color-gray-100)] rounded-lg">
+                <DollarSign size={20} className="text-[var(--color-gray-500)]" />
               </div>
               <div>
                 <p className="text-sm text-[var(--color-gray-500)]">총 판매금액</p>
@@ -350,12 +350,12 @@ export default function SettlementsPage() {
 
           <Card className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <Wallet size={20} className="text-green-600" />
+              <div className="p-2 bg-emerald-50 rounded-lg">
+                <Wallet size={20} className="text-emerald-600" />
               </div>
               <div>
                 <p className="text-sm text-[var(--color-gray-500)]">정산금액</p>
-                <p className="text-xl font-bold text-green-600">
+                <p className="text-xl font-bold text-emerald-600">
                   {summary.totalSettlement.toLocaleString()}원
                 </p>
               </div>
@@ -364,12 +364,12 @@ export default function SettlementsPage() {
 
           <Card className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-red-100 rounded-lg">
-                <CreditCard size={20} className="text-red-600" />
+              <div className="p-2 bg-[var(--color-gray-100)] rounded-lg">
+                <CreditCard size={20} className="text-[var(--color-gray-500)]" />
               </div>
               <div>
                 <p className="text-sm text-[var(--color-gray-500)]">총 수수료</p>
-                <p className="text-xl font-bold text-red-600">
+                <p className="text-xl font-bold text-[var(--color-gray-900)]">
                   -{summary.totalCommission.toLocaleString()}원
                 </p>
               </div>
@@ -378,12 +378,12 @@ export default function SettlementsPage() {
 
           <Card className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <Percent size={20} className="text-purple-600" />
+              <div className="p-2 bg-[var(--color-gray-100)] rounded-lg">
+                <Percent size={20} className="text-[var(--color-gray-500)]" />
               </div>
               <div>
                 <p className="text-sm text-[var(--color-gray-500)]">평균 수수료율</p>
-                <p className="text-xl font-bold text-purple-600">
+                <p className="text-xl font-bold text-[var(--color-gray-900)]">
                   {summary.avgCommissionRate.toFixed(1)}%
                 </p>
               </div>

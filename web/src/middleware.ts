@@ -4,23 +4,14 @@ import { getToken } from 'next-auth/jwt';
 
 // 인증이 필요하지 않은 경로
 const publicPaths = [
-  '/',
   '/auth/signin',
   '/auth/error',
   '/api/auth',
-  '/api/dashboard',
-  '/api/coupang',
+  '/api/public',
   '/pricing',
   '/terms',
   '/privacy',
-  '/sourcing',
-  '/products',
-  '/orders',
-  '/suppliers',
-  '/settlements',
-  '/tools',
-  '/reports',
-  '/settings',
+  '/test',
 ];
 
 // Premium 플랜이 필요한 경로
@@ -48,10 +39,10 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // 토큰 확인
+  // 토큰 확인 (NextAuth는 NEXTAUTH_SECRET 사용)
   const token = await getToken({
     req: request,
-    secret: process.env.AUTH_SECRET,
+    secret: process.env.NEXTAUTH_SECRET,
   });
 
   // 로그인하지 않은 경우 로그인 페이지로 리다이렉트

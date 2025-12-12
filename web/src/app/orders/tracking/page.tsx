@@ -355,12 +355,12 @@ export default function TrackingPage() {
 
       {/* 배송 이슈 알림 */}
       {statusCounts['EXCEPTION'] > 0 && (
-        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+        <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
           <div className="flex items-start gap-3">
-            <AlertCircle size={20} className="text-red-600 mt-0.5" />
+            <AlertCircle size={20} className="text-amber-600 mt-0.5" />
             <div>
-              <p className="font-medium text-red-800">배송 이슈 알림</p>
-              <p className="text-sm text-red-700 mt-1">
+              <p className="font-medium text-amber-800">배송 이슈 알림</p>
+              <p className="text-sm text-amber-700 mt-1">
                 {statusCounts['EXCEPTION']}건의 배송에서 문제가 발생했습니다. 확인이 필요합니다.
               </p>
             </div>

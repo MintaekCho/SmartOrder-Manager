@@ -106,9 +106,9 @@ export default function TrendsPage() {
   const getTrendIcon = (direction?: string) => {
     switch (direction) {
       case 'rising':
-        return <TrendingUp className="text-green-500" size={24} />;
+        return <TrendingUp className="text-emerald-500" size={24} />;
       case 'falling':
-        return <TrendingDown className="text-red-500" size={24} />;
+        return <TrendingDown className="text-amber-500" size={24} />;
       default:
         return <Minus className="text-gray-500" size={24} />;
     }
@@ -117,9 +117,9 @@ export default function TrendsPage() {
   const getTrendLabel = (direction?: string) => {
     switch (direction) {
       case 'rising':
-        return { text: '상승 추세', color: 'text-green-600' };
+        return { text: '상승 추세', color: 'text-emerald-600' };
       case 'falling':
-        return { text: '하락 추세', color: 'text-red-600' };
+        return { text: '하락 추세', color: 'text-amber-600' };
       default:
         return { text: '안정', color: 'text-gray-600' };
     }
@@ -145,7 +145,7 @@ export default function TrendsPage() {
               onChange={(e) => setKeyword(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
               placeholder="분석할 키워드를 입력하세요 (예: 사과, 귤, 한우)"
-              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-500)] focus:border-transparent"
             />
           </div>
           <div className="flex gap-2">
@@ -155,7 +155,7 @@ export default function TrendsPage() {
                 onClick={() => setPeriodDays(days)}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                   periodDays === days
-                    ? 'bg-blue-600 text-white'
+                    ? 'bg-[var(--color-gray-900)] text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
@@ -182,19 +182,19 @@ export default function TrendsPage() {
       {state.error && (
         <div className={`p-4 mb-6 rounded-lg flex items-start gap-3 ${
           state.source === 'mock' || state.source === 'mock-fallback'
-            ? 'bg-yellow-50 border border-yellow-200'
-            : 'bg-red-50 border border-red-200'
+            ? 'bg-amber-50 border border-amber-200'
+            : 'bg-amber-50 border border-amber-200'
         }`}>
           {state.source === 'mock' || state.source === 'mock-fallback' ? (
-            <Info className="text-yellow-500 flex-shrink-0 mt-0.5" size={20} />
+            <Info className="text-amber-500 flex-shrink-0 mt-0.5" size={20} />
           ) : (
-            <AlertCircle className="text-red-500 flex-shrink-0 mt-0.5" size={20} />
+            <AlertCircle className="text-amber-500 flex-shrink-0 mt-0.5" size={20} />
           )}
           <div>
             <p className={`font-medium ${
               state.source === 'mock' || state.source === 'mock-fallback'
-                ? 'text-yellow-700'
-                : 'text-red-700'
+                ? 'text-amber-700'
+                : 'text-amber-700'
             }`}>
               {state.source === 'mock' || state.source === 'mock-fallback'
                 ? '네이버 API 미설정'
@@ -202,13 +202,13 @@ export default function TrendsPage() {
             </p>
             <p className={`text-sm mt-1 ${
               state.source === 'mock' || state.source === 'mock-fallback'
-                ? 'text-yellow-600'
-                : 'text-red-600'
+                ? 'text-amber-600'
+                : 'text-amber-600'
             }`}>
               {state.error}
             </p>
             {(state.source === 'mock' || state.source === 'mock-fallback') && (
-              <p className="text-xs text-yellow-500 mt-2">
+              <p className="text-xs text-amber-500 mt-2">
                 .env 파일에 NAVER_CLIENT_ID와 NAVER_CLIENT_SECRET을 설정하면 실제 트렌드 데이터를 조회할 수 있습니다.
               </p>
             )}
@@ -375,7 +375,7 @@ export default function TrendsPage() {
       {state.loading && (
         <Card>
           <div className="text-center py-12">
-            <RefreshCw className="mx-auto text-blue-500 mb-4 animate-spin" size={48} />
+            <RefreshCw className="mx-auto text-[var(--color-gray-500)] mb-4 animate-spin" size={48} />
             <h3 className="text-xl font-semibold text-gray-700 mb-2">
               "{keyword}" 트렌드 분석 중...
             </h3>
@@ -385,15 +385,15 @@ export default function TrendsPage() {
       )}
 
       {/* API 설정 안내 */}
-      <Card className="mt-6 bg-blue-50 border-blue-200">
+      <Card className="mt-6 bg-[var(--color-gray-50)] border-[var(--color-gray-200)]">
         <div className="flex items-start gap-3">
-          <Info className="text-blue-500 flex-shrink-0 mt-0.5" size={20} />
+          <Info className="text-[var(--color-gray-500)] flex-shrink-0 mt-0.5" size={20} />
           <div>
-            <p className="font-medium text-blue-700">네이버 데이터랩 API 설정</p>
-            <p className="text-sm text-blue-600 mt-1">
+            <p className="font-medium text-[var(--color-gray-700)]">네이버 데이터랩 API 설정</p>
+            <p className="text-sm text-[var(--color-gray-600)] mt-1">
               실제 검색 트렌드 데이터를 조회하려면 네이버 개발자센터에서 API 키를 발급받아 .env 파일에 설정하세요.
             </p>
-            <div className="mt-2 p-2 bg-blue-100 rounded text-xs font-mono text-blue-700">
+            <div className="mt-2 p-2 bg-[var(--color-gray-100)] rounded text-xs font-mono text-[var(--color-gray-700)]">
               NAVER_CLIENT_ID=your_client_id<br/>
               NAVER_CLIENT_SECRET=your_client_secret
             </div>
@@ -401,7 +401,7 @@ export default function TrendsPage() {
               href="https://developers.naver.com/apps/#/register"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-block mt-2 text-sm text-blue-600 hover:text-blue-800 underline"
+              className="inline-block mt-2 text-sm text-[var(--color-gray-600)] hover:text-[var(--color-gray-800)] underline"
             >
               네이버 개발자센터 바로가기
             </a>

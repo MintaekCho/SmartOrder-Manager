@@ -140,7 +140,7 @@ function BillingContent() {
                   </p>
                 )}
                 {currentSubscription?.cancelAtPeriodEnd && (
-                  <p className="text-sm text-orange-600 mt-2 flex items-center gap-1">
+                  <p className="text-sm text-amber-600 mt-2 flex items-center gap-1">
                     <AlertCircle size={14} />
                     구독 취소 예정 (현재 기간 종료 후)
                   </p>
@@ -150,7 +150,7 @@ function BillingContent() {
                 <button
                   onClick={handleCancel}
                   disabled={isCanceling}
-                  className="px-4 py-2 text-sm text-red-600 border border-red-300 rounded-lg hover:bg-red-50 disabled:opacity-50"
+                  className="px-4 py-2 text-sm text-[var(--color-gray-600)] border border-[var(--color-gray-300)] rounded-lg hover:bg-[var(--color-gray-50)] disabled:opacity-50"
                 >
                   {isCanceling ? '처리 중...' : '구독 취소'}
                 </button>
@@ -171,7 +171,7 @@ function BillingContent() {
 
             <div className="p-6">
               {/* Plan Summary */}
-              <div className="bg-blue-50 rounded-xl p-4 mb-6">
+              <div className="bg-[var(--color-gray-50)] rounded-xl p-4 mb-6">
                 <div className="flex items-center justify-between mb-4">
                   <span className="font-medium text-gray-900">{selectedPlan.name} 플랜</span>
                   <span className="text-lg font-bold text-gray-900">
@@ -181,7 +181,7 @@ function BillingContent() {
                   </span>
                 </div>
                 {billingCycle === 'yearly' && selectedPlan.yearlyPrice && (
-                  <p className="text-sm text-green-600">
+                  <p className="text-sm text-emerald-600">
                     월 결제 대비 {formatPrice(selectedPlan.price * 12 - selectedPlan.yearlyPrice)}원 절약
                   </p>
                 )}
@@ -195,7 +195,7 @@ function BillingContent() {
                     .filter((f) => f.included)
                     .map((feature) => (
                       <li key={feature.name} className="flex items-center gap-2 text-sm text-gray-700">
-                        <Check size={16} className="text-green-600" />
+                        <Check size={16} className="text-emerald-600" />
                         {feature.name}
                         {feature.limit && (
                           <span className="text-gray-500">({feature.limit})</span>
@@ -207,9 +207,9 @@ function BillingContent() {
 
               {/* Error Message */}
               {error && (
-                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
-                  <AlertCircle className="text-red-600 flex-shrink-0 mt-0.5" size={20} />
-                  <p className="text-sm text-red-600">{error}</p>
+                <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3">
+                  <AlertCircle className="text-amber-600 flex-shrink-0 mt-0.5" size={20} />
+                  <p className="text-sm text-amber-600">{error}</p>
                 </div>
               )}
 
@@ -217,7 +217,7 @@ function BillingContent() {
               <button
                 onClick={handlePayment}
                 disabled={isLoading}
-                className="w-full py-3 px-4 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="w-full py-3 px-4 bg-[var(--color-gray-900)] text-white font-medium rounded-xl hover:bg-[var(--color-gray-800)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 <CreditCard size={20} />
                 {isLoading ? '처리 중...' : '카드 등록 및 결제하기'}

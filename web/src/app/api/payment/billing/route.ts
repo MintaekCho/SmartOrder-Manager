@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { getAuthSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { issueBillingKey, chargeBilling, generateOrderId } from '@/lib/payment/toss';
 import { PLANS } from '@/lib/subscription/plans';
@@ -7,7 +7,7 @@ import { PLANS } from '@/lib/subscription/plans';
 // 빌링키 발급 및 첫 결제
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
+    const session = await getAuthSession();
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

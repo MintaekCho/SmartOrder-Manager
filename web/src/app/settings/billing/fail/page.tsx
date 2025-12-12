@@ -13,8 +13,8 @@ function FailContent() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="bg-white p-8 rounded-2xl shadow-xl text-center max-w-md">
-        <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
-          <XCircle size={40} className="text-red-600" />
+        <div className="w-16 h-16 rounded-full bg-amber-50 flex items-center justify-center mx-auto mb-4">
+          <XCircle size={40} className="text-amber-600" />
         </div>
         <h1 className="text-xl font-semibold text-gray-900 mb-2">결제 실패</h1>
         <p className="text-gray-600 mb-2">
@@ -26,7 +26,7 @@ function FailContent() {
         <div className="space-y-3">
           <Link
             href="/settings/billing?plan=PREMIUM"
-            className="block w-full px-6 py-3 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700"
+            className="block w-full px-6 py-3 bg-[var(--color-gray-900)] text-white font-medium rounded-xl hover:bg-[var(--color-gray-800)]"
           >
             다시 시도하기
           </Link>

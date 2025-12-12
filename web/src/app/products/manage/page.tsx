@@ -272,7 +272,7 @@ export default function ProductManagePage() {
           <Button variant="ghost" size="sm" title="수정">
             <Edit size={16} />
           </Button>
-          <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-600" title="삭제">
+          <Button variant="ghost" size="sm" className="text-[var(--color-gray-400)] hover:text-[var(--color-gray-500)]" title="삭제">
             <Trash2 size={16} />
           </Button>
         </div>
@@ -293,8 +293,8 @@ export default function ProductManagePage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <Card>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
-              <Package size={20} className="text-blue-600" />
+            <div className="w-10 h-10 rounded-lg bg-[var(--color-gray-100)] flex items-center justify-center">
+              <Package size={20} className="text-[var(--color-gray-500)]" />
             </div>
             <div>
               <p className="text-sm text-[var(--color-gray-500)]">전체 상품</p>
@@ -304,34 +304,34 @@ export default function ProductManagePage() {
         </Card>
         <Card>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
-              <TrendingUp size={20} className="text-green-600" />
+            <div className="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center">
+              <TrendingUp size={20} className="text-emerald-600" />
             </div>
             <div>
               <p className="text-sm text-[var(--color-gray-500)]">판매중</p>
-              <p className="text-xl font-bold text-green-600">{stats.selling}</p>
+              <p className="text-xl font-bold text-emerald-600">{stats.selling}</p>
             </div>
           </div>
         </Card>
         <Card>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-yellow-100 flex items-center justify-center">
-              <AlertCircle size={20} className="text-yellow-600" />
+            <div className="w-10 h-10 rounded-lg bg-amber-50 flex items-center justify-center">
+              <AlertCircle size={20} className="text-amber-600" />
             </div>
             <div>
               <p className="text-sm text-[var(--color-gray-500)]">승인대기</p>
-              <p className="text-xl font-bold text-yellow-600">{stats.pending}</p>
+              <p className="text-xl font-bold text-amber-600">{stats.pending}</p>
             </div>
           </div>
         </Card>
         <Card>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center">
-              <TrendingDown size={20} className="text-red-600" />
+            <div className="w-10 h-10 rounded-lg bg-[var(--color-gray-100)] flex items-center justify-center">
+              <TrendingDown size={20} className="text-[var(--color-gray-500)]" />
             </div>
             <div>
               <p className="text-sm text-[var(--color-gray-500)]">판매중지</p>
-              <p className="text-xl font-bold text-red-600">{stats.suspended}</p>
+              <p className="text-xl font-bold text-[var(--color-gray-600)]">{stats.suspended}</p>
             </div>
           </div>
         </Card>
@@ -339,11 +339,11 @@ export default function ProductManagePage() {
 
       {/* 에러 메시지 */}
       {error && (
-        <div className="p-4 mb-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
-          <AlertCircle size={20} className="text-red-500 mt-0.5 flex-shrink-0" />
+        <div className="p-4 mb-4 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3">
+          <AlertCircle size={20} className="text-amber-500 mt-0.5 flex-shrink-0" />
           <div>
-            <p className="font-medium text-red-700">API 오류</p>
-            <p className="text-sm text-red-600 mt-1">{error}</p>
+            <p className="font-medium text-amber-700">API 오류</p>
+            <p className="text-sm text-amber-600 mt-1">{error}</p>
           </div>
         </div>
       )}
@@ -428,11 +428,11 @@ export default function ProductManagePage() {
                   <span className="ml-2 text-[var(--color-gray-600)]">상세 정보를 불러오는 중...</span>
                 </div>
               ) : detailError ? (
-                <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
-                  <AlertCircle size={20} className="text-red-500 mt-0.5 flex-shrink-0" />
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3">
+                  <AlertCircle size={20} className="text-amber-500 mt-0.5 flex-shrink-0" />
                   <div>
-                    <p className="font-medium text-red-700">상세 정보 조회 실패</p>
-                    <p className="text-sm text-red-600 mt-1">{detailError}</p>
+                    <p className="font-medium text-amber-700">상세 정보 조회 실패</p>
+                    <p className="text-sm text-amber-600 mt-1">{detailError}</p>
                   </div>
                 </div>
               ) : productDetail ? (
@@ -590,7 +590,7 @@ export default function ProductManagePage() {
 
             {/* 모달 푸터 */}
             <div className="flex justify-end gap-2 p-4 border-t border-[var(--color-gray-200)]">
-              <Button variant="outline" onClick={closeModal}>
+              <Button variant="secondary" onClick={closeModal}>
                 닫기
               </Button>
             </div>

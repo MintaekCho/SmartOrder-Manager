@@ -145,7 +145,7 @@ export default function SuppliersSearchPage() {
                 <div>
                   <h3 className="font-semibold text-[var(--color-gray-900)]">{site.name}</h3>
                   <div className="flex items-center gap-1 text-sm text-[var(--color-gray-500)]">
-                    <Star size={12} className="fill-yellow-400 text-yellow-400" />
+                    <Star size={12} className="fill-amber-400 text-amber-400" />
                     <span>{site.rating}</span>
                   </div>
                 </div>

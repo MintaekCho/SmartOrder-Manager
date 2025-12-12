@@ -256,7 +256,7 @@ export default function AIThumbnailPage() {
                   />
                   <button
                     onClick={clearReferenceImage}
-                    className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
+                    className="absolute top-2 right-2 p-1 bg-[var(--color-gray-500)] text-white rounded-full hover:bg-[var(--color-gray-600)]"
                   >
                     <X size={16} />
                   </button>
@@ -412,7 +412,7 @@ export default function AIThumbnailPage() {
 
           {/* 에러 메시지 */}
           {error && (
-            <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+            <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg text-amber-700 text-sm">
               {error}
             </div>
           )}
@@ -465,9 +465,9 @@ export default function AIThumbnailPage() {
             </div>
 
             {/* 안내 */}
-            <div className="mt-4 p-4 bg-blue-50 rounded-lg">
-              <h4 className="font-medium text-blue-800 mb-2">사용 팁</h4>
-              <ul className="text-sm text-blue-700 space-y-1">
+            <div className="mt-4 p-4 bg-[var(--color-gray-50)] rounded-lg">
+              <h4 className="font-medium text-[var(--color-gray-800)] mb-2">사용 팁</h4>
+              <ul className="text-sm text-[var(--color-gray-600)] space-y-1">
                 <li>• 상품명을 구체적으로 입력하면 더 정확한 결과를 얻을 수 있습니다</li>
                 <li>• 생성된 이미지가 마음에 들지 않으면 "재편집" 버튼을 눌러 수정하세요</li>
                 <li>• 기존 상품 사진이 있다면 "이미지 보정" 모드를 사용해보세요</li>

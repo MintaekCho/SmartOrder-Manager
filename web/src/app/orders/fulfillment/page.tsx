@@ -404,7 +404,7 @@ export default function FulfillmentPage() {
               {item.wholesale.productName}
             </p>
             {item.wholesale.stock !== undefined && (
-              <p className={`text-xs ${item.wholesale.stock > 0 ? 'text-green-600' : 'text-red-600'}`}>
+              <p className={`text-xs ${item.wholesale.stock > 0 ? 'text-emerald-600' : 'text-[var(--color-gray-500)]'}`}>
                 재고: {item.wholesale.stock > 0 ? `${item.wholesale.stock}개` : '품절'}
               </p>
             )}
@@ -422,7 +422,7 @@ export default function FulfillmentPage() {
             <ArrowRight size={12} className="text-[var(--color-gray-400)]" />
             <span className="font-medium">{item.sellingPrice.toLocaleString()}원</span>
           </div>
-          <p className={`text-sm font-medium ${item.marginRate > 30 ? 'text-green-600' : item.marginRate > 15 ? 'text-yellow-600' : 'text-red-600'}`}>
+          <p className={`text-sm font-medium ${item.marginRate > 30 ? 'text-emerald-600' : item.marginRate > 15 ? 'text-[var(--color-gray-700)]' : 'text-amber-600'}`}>
             마진 {item.margin.toLocaleString()}원 ({item.marginRate}%)
           </p>
         </div>
@@ -474,7 +474,7 @@ export default function FulfillmentPage() {
       {/* 연결 상태 */}
       <div className="flex items-center justify-between mb-4">
         {isConnected ? (
-          <div className="flex items-center gap-2 text-green-600">
+          <div className="flex items-center gap-2 text-emerald-600">
             <Wifi size={16} />
             <span className="text-sm">쿠팡 API 연결됨</span>
           </div>
@@ -488,7 +488,7 @@ export default function FulfillmentPage() {
 
       {/* 에러 메시지 */}
       {error && (
-        <div className="p-4 mb-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+        <div className="p-4 mb-4 bg-amber-50 border border-amber-200 rounded-lg text-amber-700 text-sm">
           {error}
         </div>
       )}
@@ -523,48 +523,48 @@ export default function FulfillmentPage() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <Card className="p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-yellow-100 rounded-lg">
-              <Clock size={20} className="text-yellow-600" />
+            <div className="p-2 bg-amber-50 rounded-lg">
+              <Clock size={20} className="text-amber-600" />
             </div>
             <div>
               <p className="text-sm text-[var(--color-gray-500)]">발주 대기</p>
-              <p className="text-2xl font-bold text-[var(--color-gray-900)]">{pendingCount}</p>
+              <p className="text-2xl font-bold text-amber-600">{pendingCount}</p>
             </div>
           </div>
         </Card>
 
         <Card className="p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-red-100 rounded-lg">
-              <AlertTriangle size={20} className="text-red-600" />
+            <div className="p-2 bg-[var(--color-gray-100)] rounded-lg">
+              <AlertTriangle size={20} className="text-[var(--color-gray-500)]" />
             </div>
             <div>
               <p className="text-sm text-[var(--color-gray-500)]">품절 상품</p>
-              <p className="text-2xl font-bold text-red-600">{outOfStockCount}</p>
+              <p className="text-2xl font-bold text-[var(--color-gray-900)]">{outOfStockCount}</p>
             </div>
           </div>
         </Card>
 
         <Card className="p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <CheckCircle size={20} className="text-green-600" />
+            <div className="p-2 bg-emerald-50 rounded-lg">
+              <CheckCircle size={20} className="text-emerald-600" />
             </div>
             <div>
               <p className="text-sm text-[var(--color-gray-500)]">발주 완료</p>
-              <p className="text-2xl font-bold text-[var(--color-gray-900)]">{completedOrders.length}</p>
+              <p className="text-2xl font-bold text-emerald-600">{completedOrders.length}</p>
             </div>
           </div>
         </Card>
 
         <Card className="p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <ShoppingCart size={20} className="text-blue-600" />
+            <div className="p-2 bg-[var(--color-gray-100)] rounded-lg">
+              <ShoppingCart size={20} className="text-[var(--color-gray-500)]" />
             </div>
             <div>
               <p className="text-sm text-[var(--color-gray-500)]">예상 총 마진</p>
-              <p className="text-2xl font-bold text-green-600">
+              <p className="text-2xl font-bold text-emerald-600">
                 {totalMargin.toLocaleString()}원
               </p>
             </div>
@@ -675,12 +675,12 @@ export default function FulfillmentPage() {
 
       {/* 안내 메시지 */}
       {activeTab === 'pending' && outOfStockCount > 0 && (
-        <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+        <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
           <div className="flex items-start gap-3">
-            <AlertTriangle size={20} className="text-yellow-600 mt-0.5" />
+            <AlertTriangle size={20} className="text-amber-600 mt-0.5" />
             <div>
-              <p className="font-medium text-yellow-800">품절 상품 안내</p>
-              <p className="text-sm text-yellow-700 mt-1">
+              <p className="font-medium text-amber-800">품절 상품 안내</p>
+              <p className="text-sm text-amber-700 mt-1">
                 {outOfStockCount}건의 주문에서 도매처 상품이 품절되었습니다.
                 대체 상품을 찾거나 고객에게 안내가 필요합니다.
               </p>
@@ -691,12 +691,12 @@ export default function FulfillmentPage() {
 
       {/* 도매처 미연동 안내 */}
       {pendingOrders.length > 0 && (
-        <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+        <div className="mt-4 p-4 bg-[var(--color-gray-50)] border border-[var(--color-gray-200)] rounded-lg">
           <div className="flex items-start gap-3">
-            <Store size={20} className="text-blue-600 mt-0.5" />
+            <Store size={20} className="text-[var(--color-gray-600)] mt-0.5" />
             <div>
-              <p className="font-medium text-blue-800">도매처 연동 안내</p>
-              <p className="text-sm text-blue-700 mt-1">
+              <p className="font-medium text-[var(--color-gray-800)]">도매처 연동 안내</p>
+              <p className="text-sm text-[var(--color-gray-600)] mt-1">
                 현재 도매처 정보가 연동되지 않았습니다. 마진율은 예상치(50%)로 계산됩니다.
                 실제 도매처 연동 시 정확한 마진 계산이 가능합니다.
               </p>

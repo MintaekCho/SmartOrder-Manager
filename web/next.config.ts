@@ -21,6 +21,10 @@ const nextConfig: NextConfig = {
         protocol: 'http',
         hostname: 'k.kakaocdn.net', // Kakao 프로필 이미지 (http)
       },
+      {
+        protocol: 'https',
+        hostname: 'uvulklpqhssprgwhukup.supabase.co', // Supabase Storage
+      },
     ],
   },
 };

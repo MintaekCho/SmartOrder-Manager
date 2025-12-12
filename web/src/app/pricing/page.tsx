@@ -13,12 +13,12 @@ export default function PricingPage() {
   const currentPlan = (session?.user as any)?.subscription?.plan || null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       {/* Header */}
       <header className="py-6 px-4">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-gray-700 to-gray-900 flex items-center justify-center">
               <TrendingUp size={22} className="text-white" />
             </div>
             <span className="font-bold text-xl text-gray-900">CoupangAuto</span>
@@ -33,7 +33,7 @@ export default function PricingPage() {
           ) : (
             <Link
               href="/auth/signin"
-              className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              className="px-4 py-2 text-sm font-medium bg-[var(--color-gray-900)] text-white rounded-lg hover:bg-[var(--color-gray-800)]"
             >
               로그인
             </Link>
@@ -58,7 +58,7 @@ export default function PricingPage() {
           <button
             onClick={() => setIsYearly(!isYearly)}
             className={`relative w-14 h-7 rounded-full transition-colors ${
-              isYearly ? 'bg-blue-600' : 'bg-gray-300'
+              isYearly ? 'bg-[var(--color-gray-900)]' : 'bg-gray-300'
             }`}
           >
             <span
@@ -69,7 +69,7 @@ export default function PricingPage() {
           </button>
           <span className={`text-sm font-medium ${isYearly ? 'text-gray-900' : 'text-gray-500'}`}>
             연간 결제
-            <span className="ml-2 px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">
+            <span className="ml-2 px-2 py-0.5 bg-emerald-50 text-emerald-700 text-xs rounded-full">
               20% 할인
             </span>
           </span>
@@ -90,12 +90,12 @@ export default function PricingPage() {
                 key={plan.id}
                 className={`relative bg-white rounded-2xl shadow-xl p-8 ${
                   plan.popular
-                    ? 'ring-2 ring-blue-600'
+                    ? 'ring-2 ring-[var(--color-gray-900)]'
                     : 'border border-gray-200'
                 }`}
               >
                 {plan.popular && (
-                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-blue-600 text-white text-sm font-medium rounded-full flex items-center gap-1">
+                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-[var(--color-gray-900)] text-white text-sm font-medium rounded-full flex items-center gap-1">
                     <Zap size={14} />
                     인기
                   </div>
@@ -137,7 +137,7 @@ export default function PricingPage() {
                 ) : (
                   <Link
                     href={session ? `/settings/billing?plan=${plan.id}&billing=${isYearly ? 'yearly' : 'monthly'}` : '/auth/signin'}
-                    className="block w-full py-3 px-4 text-center bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 transition-colors"
+                    className="block w-full py-3 px-4 text-center bg-[var(--color-gray-900)] text-white font-medium rounded-xl hover:bg-[var(--color-gray-800)] transition-colors"
                   >
                     {session ? '업그레이드' : '시작하기'}
                   </Link>
@@ -147,7 +147,7 @@ export default function PricingPage() {
                   {plan.features.map((feature) => (
                     <li key={feature.name} className="flex items-start gap-3">
                       {feature.included ? (
-                        <Check size={20} className="text-green-600 mt-0.5 flex-shrink-0" />
+                        <Check size={20} className="text-emerald-600 mt-0.5 flex-shrink-0" />
                       ) : (
                         <X size={20} className="text-gray-300 mt-0.5 flex-shrink-0" />
                       )}

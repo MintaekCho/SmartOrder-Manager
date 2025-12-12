@@ -4,6 +4,8 @@ import { useEffect, useState, useRef } from 'react';
 import { DashboardLayout } from '@/components/layout';
 import { StatCard, DataTable, Badge, Button } from '@/components/ui';
 import { RevenueChart, CategoryChart } from '@/components/charts';
+import { useSystemMode } from '@/contexts/SystemModeContext';
+import InventoryDashboard from '@/components/dashboard/InventoryDashboard';
 import {
   ShoppingCart,
   Package,
@@ -53,7 +55,8 @@ const statusMap = {
   error: { label: '오류', variant: 'error' as const },
 };
 
-export default function DashboardPage() {
+// 위탁판매 대시보드 컴포넌트
+function DropshippingDashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [revenueData, setRevenueData] = useState<RevenueData[]>([]);
@@ -61,7 +64,6 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // 초기 로드 여부 체크
   const isInitialMount = useRef(true);
 
   useEffect(() => {
@@ -73,7 +75,6 @@ export default function DashboardPage() {
         setLoading(true);
         setError(null);
 
-        // 병렬로 모든 데이터 가져오기
         const [statsRes, ordersRes, revenueRes, categoryRes] = await Promise.all([
           fetch('/api/dashboard/stats'),
           fetch('/api/dashboard/recent-orders?limit=5'),
@@ -81,7 +82,6 @@ export default function DashboardPage() {
           fetch('/api/dashboard/category-sales'),
         ]);
 
-        // 에러 체크
         if (!statsRes.ok || !ordersRes.ok || !revenueRes.ok || !categoryRes.ok) {
           throw new Error('API 호출 실패');
         }
@@ -159,50 +159,37 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <DashboardLayout
-        title="대시보드"
-        breadcrumb={[{ name: '홈', href: '/' }, { name: '대시보드' }]}
-      >
-        <div className="flex items-center justify-center h-[60vh]">
-          <div className="flex flex-col items-center gap-4">
-            <Loader2 className="w-8 h-8 animate-spin text-[var(--color-primary-600)]" />
-            <p className="text-[var(--color-text-secondary)]">데이터를 불러오는 중...</p>
-          </div>
+      <div className="flex items-center justify-center h-[60vh]">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-8 h-8 animate-spin text-[var(--color-primary-600)]" />
+          <p className="text-[var(--color-text-secondary)]">데이터를 불러오는 중...</p>
         </div>
-      </DashboardLayout>
+      </div>
     );
   }
 
   if (error) {
     return (
-      <DashboardLayout
-        title="대시보드"
-        breadcrumb={[{ name: '홈', href: '/' }, { name: '대시보드' }]}
-      >
-        <div className="flex items-center justify-center h-[60vh]">
-          <div className="flex flex-col items-center gap-4 text-center">
-            <AlertCircle className="w-12 h-12 text-[var(--color-error)]" />
-            <div>
-              <p className="text-lg font-medium text-[var(--color-text-primary)]">데이터 로드 실패</p>
-              <p className="text-[var(--color-text-secondary)] mt-1">{error}</p>
-              <p className="text-sm text-[var(--color-text-tertiary)] mt-2">
-                쿠팡 Wing API 설정을 확인해주세요.
-              </p>
-            </div>
-            <Button onClick={() => window.location.reload()}>
-              다시 시도
-            </Button>
+      <div className="flex items-center justify-center h-[60vh]">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <AlertCircle className="w-12 h-12 text-[var(--color-error)]" />
+          <div>
+            <p className="text-lg font-medium text-[var(--color-text-primary)]">데이터 로드 실패</p>
+            <p className="text-[var(--color-text-secondary)] mt-1">{error}</p>
+            <p className="text-sm text-[var(--color-text-tertiary)] mt-2">
+              쿠팡 Wing API 설정을 확인해주세요.
+            </p>
           </div>
+          <Button onClick={() => window.location.reload()}>
+            다시 시도
+          </Button>
         </div>
-      </DashboardLayout>
+      </div>
     );
   }
 
   return (
-    <DashboardLayout
-      title="대시보드"
-      breadcrumb={[{ name: '홈', href: '/' }, { name: '대시보드' }]}
-    >
+    <>
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
         <StatCard
@@ -260,6 +247,37 @@ export default function DashboardPage() {
         onRowClick={(item) => console.log('Clicked:', item)}
         emptyMessage="최근 주문이 없습니다."
       />
+    </>
+  );
+}
+
+export default function DashboardPage() {
+  const { settings, getModeLabel } = useSystemMode();
+
+  // 모드별 대시보드 타이틀
+  const getDashboardTitle = () => {
+    switch (settings.mode) {
+      case 'dropshipping':
+        return '위탁판매 대시보드';
+      case 'inventory':
+        return '재고 관리 대시보드';
+      case 'hybrid':
+        return '통합 대시보드';
+      default:
+        return '대시보드';
+    }
+  };
+
+  return (
+    <DashboardLayout
+      title={getDashboardTitle()}
+      breadcrumb={[{ name: '홈', href: '/' }, { name: '대시보드' }]}
+    >
+      {settings.mode === 'inventory' ? (
+        <InventoryDashboard />
+      ) : (
+        <DropshippingDashboard />
+      )}
     </DashboardLayout>
   );
 }
