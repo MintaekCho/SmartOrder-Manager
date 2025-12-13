@@ -1,11 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import DetailPageEditor from '@/components/DetailPageEditor';
 import { ArrowLeft, Image, Check } from 'lucide-react';
-import Link from 'next/link';
 
 export default function DetailEditorPage() {
+  const router = useRouter();
   const [exportedImage, setExportedImage] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
 
@@ -35,12 +36,12 @@ export default function DetailEditorPage() {
       <header className="bg-white border-b border-[var(--color-gray-300)] flex-shrink-0 z-10">
         <div className="px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Link
-              href="/products/automation"
+            <button
+              onClick={() => router.back()}
               className="p-2 hover:bg-[var(--color-gray-100)] rounded-lg transition-colors"
             >
               <ArrowLeft size={20} className="text-[var(--color-gray-700)]" />
-            </Link>
+            </button>
             <div>
               <h1 className="text-lg font-bold text-[var(--color-gray-900)]">상세페이지 에디터</h1>
               <p className="text-xs text-[var(--color-gray-500)]">쿠팡 상품 상세페이지 이미지를 만들어보세요</p>

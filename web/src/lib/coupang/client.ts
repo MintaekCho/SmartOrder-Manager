@@ -123,6 +123,7 @@ export class CoupangClient {
     }
 
     const data = await response.json();
+    console.log(`[Coupang API Response] Keys:`, Object.keys(data));
     return data as T;
   }
 
@@ -240,20 +241,46 @@ export class CoupangClient {
 
   // ==================== 카테고리 관련 API ====================
 
-  // 카테고리 메타 정보 조회
-  async getCategoryMeta(categoryId: number) {
-    return this.request<CoupangCategoryMetaResponse>({
+  // 전체 카테고리 목록 조회 (트리 구조로 전체 반환)
+  // GET /v2/providers/seller_api/apis/api/v1/marketplace/meta/display-categories
+  async getAllDisplayCategories() {
+    return this.request<CoupangAllCategoriesResponse>({
       method: 'GET',
-      path: `/v2/providers/seller_api/apis/api/v1/categories/${categoryId}/meta`,
+      path: '/v2/providers/seller_api/apis/api/v1/marketplace/meta/display-categories',
     });
   }
 
-  // 카테고리 검색
-  async searchCategory(keyword: string) {
-    return this.request<CoupangCategorySearchResponse>({
+  // 특정 카테고리의 하위 카테고리 조회
+  // displayCategoryCode=0 이면 최상위 카테고리 반환
+  async getDisplayCategories(displayCategoryCode: number = 0) {
+    return this.request<CoupangDisplayCategoriesResponse>({
       method: 'GET',
-      path: `/v2/providers/seller_api/apis/api/v1/categories/search`,
-      query: { keyword },
+      path: `/v2/providers/seller_api/apis/api/v1/marketplace/meta/display-categories/${displayCategoryCode}`,
+    });
+  }
+
+  // 카테고리 메타 정보 조회 (상품고시정보, 옵션, 필수서류 등)
+  async getCategoryMeta(displayCategoryCode: number) {
+    return this.request<CoupangCategoryMetaResponse>({
+      method: 'GET',
+      path: `/v2/providers/seller_api/apis/api/v1/marketplace/meta/category-related-metas/display-category-codes/${displayCategoryCode}`,
+    });
+  }
+
+  // 카테고리 추천 (상품명 기반)
+  // POST /v2/providers/openapi/apis/api/v1/categorization/predict
+  async predictCategory(productName: string, options?: {
+    productDescription?: string;
+    brand?: string;
+    attributes?: Record<string, string>;
+  }) {
+    return this.request<CoupangCategoryPredictResponse>({
+      method: 'POST',
+      path: '/v2/providers/openapi/apis/api/v1/categorization/predict',
+      body: {
+        productName,
+        ...options,
+      },
     });
   }
 
@@ -312,6 +339,34 @@ export class CoupangClient {
     return this.request<CoupangBaseResponse>({
       method: 'PUT',
       path: `/v2/providers/openapi/apis/api/v4/vendors/${vendorId}/returnRequests/${receiptId}/approval`,
+    });
+  }
+
+  // ==================== 출고지/반품지 관련 API ====================
+
+  // 출고지 목록 조회
+  // GET /v2/providers/marketplace_openapi/apis/api/v2/vendor/shipping-place/outbound
+  async getOutboundShippingPlaces(_vendorId: string, pageNum: number = 1, pageSize: number = 50) {
+    return this.request<CoupangOutboundShippingPlacesResponse>({
+      method: 'GET',
+      path: '/v2/providers/marketplace_openapi/apis/api/v2/vendor/shipping-place/outbound',
+      query: {
+        pageNum,
+        pageSize,
+      },
+    });
+  }
+
+  // 반품지 목록 조회
+  // GET /v2/providers/seller_api/apis/api/v1/vendors/{vendorId}/return-shipping-centers
+  async getReturnShippingCenters(vendorId: string, pageNum: number = 1, pageSize: number = 50) {
+    return this.request<CoupangReturnShippingCentersResponse>({
+      method: 'GET',
+      path: `/v2/providers/seller_api/apis/api/v1/vendors/${vendorId}/return-shipping-centers`,
+      query: {
+        pageNum,
+        pageSize,
+      },
     });
   }
 
@@ -399,37 +454,51 @@ export interface ShipOrderRequest {
 }
 
 export interface CreateProductRequest {
-  displayCategoryCode: number;
-  sellerProductName: string;
-  vendorId: string;
-  saleStartedAt: string;
-  saleEndedAt: string;
-  brand: string;
-  generalProductName: string;
-  productGroup: string;
-  deliveryMethod: string;
-  deliveryCompanyCode: string;
-  deliveryChargeType: string;
-  deliveryCharge: number;
-  freeShipOverAmount: number;
-  deliveryChargeOnReturn: number;
-  remoteAreaDeliverable: string;
-  unionDeliveryType: string;
-  returnCenterCode: string;
-  returnCharge: number;
-  returnChargeVendor: string;
-  afterServiceInformation: string;
-  afterServiceContactNumber: string;
-  outboundShippingPlaceCode: number;
-  vendorUserId: string;
-  requested: boolean;
-  items: CreateProductItem[];
-  requiredDocuments: RequiredDocument[];
-  extraInfoMessage: string;
-  manufacture: string;
-  contents: ProductContent[];
-  notices: ProductNotice[];
-  attributes: ProductAttribute[];
+  // 필수 필드
+  displayCategoryCode: number;           // 전시카테고리 코드 (필수)
+  sellerProductName: string;             // 등록상품명 (필수)
+  vendorId: string;                      // 업체 아이디 (필수)
+  saleStartedAt: string;                 // 판매시작일 yyyy-MM-ddTHH:mm:ss (필수)
+  saleEndedAt: string;                   // 판매종료일 yyyy-MM-ddTHH:mm:ss (필수)
+  brand: string;                         // 브랜드 (필수)
+  generalProductName: string;            // 표준 제품명 (필수)
+  productGroup: string;                  // 상품그룹 (필수)
+  deliveryMethod: string;                // 배송방법: SEQUENCIAL, VENDOR_DIRECT 등 (필수)
+  deliveryCompanyCode: string;           // 택배사 코드 (필수)
+  deliveryChargeType: string;            // 배송비종류: FREE, NOT_FREE, CHARGE_RECEIVED 등 (필수)
+  deliveryCharge: number;                // 기본배송비 (필수)
+  freeShipOverAmount: number;            // 조건부무료 기준금액 (필수)
+  deliveryChargeOnReturn: number;        // 반품배송비 (필수)
+  remoteAreaDeliverable: string;         // 도서산간배송여부: Y, N (필수)
+  unionDeliveryType: string;             // 묶음배송: UNION_DELIVERY, NOT_UNION_DELIVERY (필수)
+  returnCenterCode: string;              // 반품지 코드 (필수)
+  returnCharge: number;                  // 초도반품배송비 (필수)
+  returnChargeVendor: string;            // 반품/교환비 청구: VENDOR, BUYER (필수)
+  afterServiceInformation: string;       // A/S 안내 (필수)
+  afterServiceContactNumber: string;     // A/S 전화번호 (필수)
+  outboundShippingPlaceCode: number;     // 출고지 코드 (필수)
+  vendorUserId: string;                  // 업체 담당자 아이디 (필수)
+  requested: boolean;                    // 승인요청여부 - false: 임시저장, true: 승인요청 (필수)
+  items: CreateProductItem[];            // 아이템(옵션) 목록 (필수)
+
+  // 선택 필드
+  displayProductName?: string;           // 노출상품명 (고객에게 보이는 이름)
+  returnChargeName?: string;             // 수취인명(반품지)
+  returnZipCode?: string;                // 반품지 우편번호
+  returnAddress?: string;                // 반품지 주소
+  returnAddressDetail?: string;          // 반품지 상세주소
+  companyContactNumber?: string;         // 업체 연락처
+  manufacture?: string;                  // 제조사
+  extraInfoMessage?: string;             // 추가 메시지
+
+  // 배열 필드
+  requiredDocuments?: RequiredDocument[];  // 필수서류
+  contents?: ProductContent[];             // 상세설명
+  notices?: ProductNotice[];               // 상품고시정보
+  attributes?: ProductAttribute[];         // 구매옵션(속성)
+
+  // 묶음상품
+  bundleInfo?: BundleInfo;               // 묶음상품 정보
 }
 
 export interface CreateProductItem {
@@ -499,6 +568,12 @@ export interface ProductContent {
 export interface ContentDetail {
   content: string;
   detailType: string;
+}
+
+// 묶음상품 정보
+export interface BundleInfo {
+  bundleType: string;              // SINGLE_BUNDLE, MULTI_BUNDLE
+  bundleQuantity?: number;         // 묶음 수량
 }
 
 export interface UpdatePriceRequest {
@@ -610,30 +685,75 @@ export interface CoupangProductListResponse extends CoupangBaseResponse {
   nextToken?: string;
 }
 
+// 카테고리 목록 조회 응답
+export interface CoupangDisplayCategory {
+  displayCategoryCode: number;
+  displayCategoryName: string;
+  isLeaf: boolean; // 최하위 카테고리 여부
+  parentDisplayCategoryCode?: number;
+}
+
+export interface CoupangDisplayCategoriesResponse extends CoupangBaseResponse {
+  data: CoupangDisplayCategory[];
+}
+
+// 전체 카테고리 목록 응답 (트리 구조)
+export interface CoupangCategoryTreeNode {
+  displayItemCategoryCode: number;
+  name: string;
+  status: string;
+  child: CoupangCategoryTreeNode[];
+}
+
+export interface CoupangAllCategoriesResponse extends CoupangBaseResponse {
+  data: CoupangCategoryTreeNode;
+}
+
+// 카테고리 추천 응답
+export interface CoupangCategoryPredictResponse extends CoupangBaseResponse {
+  data: {
+    autoCategorizationPredictionResultType: string; // SINGLE, MULTIPLE, NONE
+    predictedCategoryId: string;
+    predictedCategoryName: string;
+    comment: string | null;
+  };
+}
+
+// 카테고리 메타 정보 응답
 export interface CoupangCategoryMetaResponse extends CoupangBaseResponse {
   data: {
-    categoryId: number;
-    categoryName: string;
-    attributes: {
-      attributeTypeName: string;
-      required: boolean;
-      attributeValues: string[];
-    }[];
-    notices: {
+    displayCategoryCode: number;
+    displayCategoryName: string;
+    wholeCategoryName: string;
+    // 상품고시정보 카테고리 목록
+    noticeCategories?: {
+      noticeCategoryId: string;
       noticeCategoryName: string;
       required: boolean;
-      noticeCategoryDetailNames: string[];
+      noticeItemNames: string[];
+    }[];
+    // 필수 옵션 (구매옵션)
+    attributes?: {
+      attributeTypeName: string;
+      required: boolean;
+      dataType: string;
+      attributeValues?: string[];
+    }[];
+    // 필수 서류
+    requiredDocuments?: {
+      templateName: string;
+      required: boolean;
+    }[];
+    // 인증 정보
+    certifications?: {
+      certificationType: string;
+      required: boolean;
     }[];
   };
 }
 
-export interface CoupangCategorySearchResponse extends CoupangBaseResponse {
-  data: {
-    categoryId: number;
-    categoryName: string;
-    wholeCategoryName: string;
-  }[];
-}
+// 참고: 쿠팡 API에서 카테고리 검색/추천 기능은 공식 제공되지 않음
+// 대신 getDisplayCategories로 전체 목록을 가져와서 로컬에서 필터링해야 함
 
 export interface CoupangSettlementResponse extends CoupangBaseResponse {
   data: {
@@ -664,6 +784,74 @@ export interface CoupangCancelListResponse extends CoupangBaseResponse {
   nextToken?: string;
 }
 
+// 출고지 목록 응답
+export interface OutboundShippingPlace {
+  outboundShippingPlaceCode: number;  // 출고지 코드
+  shippingPlaceName: string;          // 출고지 이름
+  placeAddresses?: {
+    addressType: string;              // ROADNAME, JIBUN
+    countryCode: string;
+    companyContactNumber?: string;    // 업체 연락처
+    phoneNumber2?: string;
+    returnZipCode: string;            // 우편번호
+    returnAddress: string;            // 주소
+    returnAddressDetail?: string;     // 상세주소
+  }[];
+  remoteAreaDeliverable?: string;     // 도서산간 배송 가능 여부
+  usable: boolean;                    // 사용 가능 여부
+}
+
+export interface CoupangOutboundShippingPlacesResponse extends CoupangBaseResponse {
+  // 새 API는 data 없이 직접 content와 pagination 반환
+  content?: OutboundShippingPlace[];
+  pagination?: {
+    currentPage: number;
+    countPerPage: number;
+    totalPages: number;
+    totalElements: number;
+  };
+  // 이전 API 호환성
+  data?: {
+    content: OutboundShippingPlace[];
+    pagination: {
+      pageNum: number;
+      pageSize: number;
+      totalElements: number;
+      totalPages: number;
+    };
+  };
+}
+
+// 반품지 목록 응답
+export interface ReturnShippingCenter {
+  returnCenterCode: string;           // 반품지 코드
+  shippingPlaceName: string;          // 반품지 이름
+  deliverCode?: string;               // 택배사 코드
+  deliverName?: string;               // 택배사 이름
+  placeAddresses?: {
+    addressType: string;              // ROADNAME, JIBUN
+    countryCode: string;
+    companyContactNumber?: string;    // 업체 연락처
+    phoneNumber2?: string;
+    returnZipCode: string;            // 우편번호
+    returnAddress: string;            // 주소
+    returnAddressDetail?: string;     // 상세주소
+  }[];
+  usable: boolean;                    // 사용 가능 여부
+}
+
+export interface CoupangReturnShippingCentersResponse extends CoupangBaseResponse {
+  data: {
+    content: ReturnShippingCenter[];
+    pagination: {
+      pageNum: number;
+      pageSize: number;
+      totalElements: number;
+      totalPages: number;
+    };
+  };
+}
+
 // 택배사 코드
 export const DELIVERY_COMPANY_CODES = {
   CJGLS: 'CJ대한통운',
@@ -678,6 +866,27 @@ export const DELIVERY_COMPANY_CODES = {
   HDEXP: '합동택배',
   CVSNET: 'GS편의점택배',
   CU: 'CU편의점택배',
+} as const;
+
+// 배송비 종류
+export const DELIVERY_CHARGE_TYPES = {
+  FREE: '무료',
+  NOT_FREE: '유료',
+  CHARGE_RECEIVED: '착불',
+  CONDITIONAL_FREE: '조건부 무료',
+} as const;
+
+// 배송방법
+export const DELIVERY_METHODS = {
+  SEQUENCIAL: '일반배송',
+  VENDOR_DIRECT: '업체직송',
+  MAKE_ORDER: '주문제작',
+} as const;
+
+// 묶음배송 타입
+export const UNION_DELIVERY_TYPES = {
+  UNION_DELIVERY: '묶음배송 가능',
+  NOT_UNION_DELIVERY: '묶음배송 불가',
 } as const;
 
 // 싱글톤 인스턴스

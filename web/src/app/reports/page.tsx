@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { DashboardLayout } from '@/components/layout';
 import { Button, Card } from '@/components/ui';
-import { useSystemMode } from '@/contexts/SystemModeContext';
+import { useFeatureSettings } from '@/contexts/FeatureSettingsContext';
 import {
   RefreshCw,
   Download,
@@ -738,19 +738,20 @@ ${report.lowStockProducts.map((p) => `- ${p.productName}: 현재 ${p.currentStoc
 
 // 메인 페이지 컴포넌트
 export default function ReportsPage() {
-  const { settings, getModeLabel } = useSystemMode();
+  const { features, isFeatureEnabled } = useFeatureSettings();
+
+  // 활성화된 기능에 따라 리포트 타입 결정
+  const showInventoryReport = isFeatureEnabled('inventory') && !isFeatureEnabled('coupangOrders');
+  const showSalesReport = isFeatureEnabled('coupangOrders') || isFeatureEnabled('shopOrders');
 
   const getReportTitle = () => {
-    switch (settings.mode) {
-      case 'dropshipping':
-        return '판매 통계 리포트';
-      case 'inventory':
-        return '재고 통계 리포트';
-      case 'hybrid':
-        return '통합 통계 리포트';
-      default:
-        return '통계 리포트';
+    if (showInventoryReport && !showSalesReport) {
+      return '재고 통계 리포트';
     }
+    if (showSalesReport && !showInventoryReport) {
+      return '판매 통계 리포트';
+    }
+    return '통합 통계 리포트';
   };
 
   return (
@@ -761,7 +762,7 @@ export default function ReportsPage() {
         { name: '통계 리포트' },
       ]}
     >
-      {settings.mode === 'inventory' ? (
+      {showInventoryReport && !showSalesReport ? (
         <InventoryReport />
       ) : (
         <SalesReport />

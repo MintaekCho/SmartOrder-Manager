@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import { DashboardLayout } from '@/components/layout';
 import { StatCard, DataTable, Badge, Button } from '@/components/ui';
 import { RevenueChart, CategoryChart } from '@/components/charts';
-import { useSystemMode } from '@/contexts/SystemModeContext';
+import { useFeatureSettings } from '@/contexts/FeatureSettingsContext';
 import InventoryDashboard from '@/components/dashboard/InventoryDashboard';
 import {
   ShoppingCart,
@@ -252,20 +252,25 @@ function DropshippingDashboard() {
 }
 
 export default function DashboardPage() {
-  const { settings, getModeLabel } = useSystemMode();
+  const { features, isFeatureEnabled } = useFeatureSettings();
 
-  // 모드별 대시보드 타이틀
+  // 활성화된 기능에 따라 대시보드 타입 결정
+  const showInventoryDashboard = isFeatureEnabled('inventory') && !isFeatureEnabled('coupangOrders');
+
+  // 대시보드 타이틀 결정
   const getDashboardTitle = () => {
-    switch (settings.mode) {
-      case 'dropshipping':
-        return '위탁판매 대시보드';
-      case 'inventory':
-        return '재고 관리 대시보드';
-      case 'hybrid':
-        return '통합 대시보드';
-      default:
-        return '대시보드';
+    const activeFeatureCount = Object.values(features).filter(Boolean).length;
+
+    if (showInventoryDashboard) {
+      return '재고 관리 대시보드';
     }
+    if (isFeatureEnabled('coupangOrders') || isFeatureEnabled('coupangProducts')) {
+      return '위탁판매 대시보드';
+    }
+    if (isFeatureEnabled('shopProducts') || isFeatureEnabled('shopOrders')) {
+      return '자사몰 대시보드';
+    }
+    return '대시보드';
   };
 
   return (
@@ -273,7 +278,7 @@ export default function DashboardPage() {
       title={getDashboardTitle()}
       breadcrumb={[{ name: '홈', href: '/' }, { name: '대시보드' }]}
     >
-      {settings.mode === 'inventory' ? (
+      {showInventoryDashboard ? (
         <InventoryDashboard />
       ) : (
         <DropshippingDashboard />

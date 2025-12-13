@@ -62,6 +62,10 @@ model User {
   addresses      Address[]
   cartItems      CartItem[]
 
+  // 통합 상품 관리 관계
+  masterProducts   MasterProduct[]
+  platformConfigs  PlatformConfig[]
+
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
@@ -834,6 +838,9 @@ model InventoryItem {
   shopDescription String?  @db.Text         // 자사몰용 상세 설명
   shopImages      Json     @default("[]")   // 자사몰용 이미지 배열
 
+  // 통합 상품 연결
+  masterProduct   MasterProduct?
+
   // 메타데이터
   lastCountedAt   DateTime?  // 마지막 실사일
   expiryDate      DateTime?  // 유통기한
@@ -1217,12 +1224,262 @@ model ShopCategory {
   // 상품코드 시퀀스 (카테고리별 자동 증가)
   productSeq      Int      @default(0) // 마지막으로 생성된 상품 번호
 
+  // 플랫폼별 카테고리 매핑 코드
+  coupangCategoryCode  String?  // 쿠팡 displayCategoryCode
+  naverCategoryId      String?  // 네이버 leafCategoryId
+
+  // 통합 상품 관계
+  masterProducts    MasterProduct[]
+  categoryMappings  CategoryMapping[]
+
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
   @@index([parentId])
   @@index([displayOrder])
   @@map("shop_categories")
+}
+
+// ============================================
+// 통합 상품 관리 (멀티 플랫폼)
+// ============================================
+
+// 마스터 상품 (원본 상품 정보)
+model MasterProduct {
+  id              String   @id @default(cuid())
+
+  // 사용자
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // 기본 정보
+  name            String   // 상품명
+  description     String?  @db.Text // 상품 설명
+  brand           String?  // 브랜드
+
+  // 카테고리 (내부 분류)
+  categoryId      String?
+  category        ShopCategory? @relation(fields: [categoryId], references: [id])
+
+  // 이미지
+  thumbnailUrl    String?  // 대표 이미지
+  images          Json     @default("[]") // 추가 이미지 배열
+
+  // 가격
+  costPrice       Int      @default(0) // 원가
+  basePrice       Int      // 기본 판매가
+
+  // 재고 (자사몰 연동 시)
+  inventoryItemId String?  @unique // InventoryItem 연결
+  inventoryItem   InventoryItem? @relation(fields: [inventoryItemId], references: [id])
+
+  // 상품 옵션 (JSON 형태로 통합 관리)
+  // [{ name: "색상", values: ["레드", "블루"] }, { name: "사이즈", values: ["S", "M", "L"] }]
+  options         Json     @default("[]")
+
+  // 상세 정보 (HTML)
+  detailHtml      String?  @db.Text
+
+  // 상품 고시 정보 (JSON)
+  // { "제조사": "...", "원산지": "...", "유통기한": "..." }
+  notices         Json     @default("{}")
+
+  // 배송 정보
+  shippingFee     Int      @default(0)  // 배송비
+  freeShipOver    Int?     // 무료배송 기준금액
+
+  // 상태
+  status          MasterProductStatus @default(DRAFT)
+
+  // 플랫폼별 상품 등록 정보
+  platformProducts PlatformProduct[]
+
+  // 등록 로그
+  uploadLogs      ProductUploadLog[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@map("master_products")
+}
+
+enum MasterProductStatus {
+  DRAFT        // 작성 중
+  READY        // 등록 대기
+  UPLOADING    // 업로드 중
+  ACTIVE       // 활성 (최소 1개 플랫폼 등록)
+  PAUSED       // 일시 중지
+  DELETED      // 삭제됨
+}
+
+// 플랫폼별 상품 정보
+model PlatformProduct {
+  id              String   @id @default(cuid())
+
+  // 마스터 상품 연결
+  masterProductId String
+  masterProduct   MasterProduct @relation(fields: [masterProductId], references: [id], onDelete: Cascade)
+
+  // 플랫폼 정보
+  platform        Platform
+
+  // 플랫폼별 상품 ID
+  platformProductId  String?  // 쿠팡: sellerProductId, 네이버: productNo
+  platformItemId     String?  // 쿠팡: vendorItemId
+  platformUrl        String?  // 플랫폼 상품 URL
+
+  // 플랫폼별 설정
+  platformName    String?  // 플랫폼용 상품명 (다르게 설정 가능)
+  platformPrice   Int?     // 플랫폼용 가격 (다르게 설정 가능)
+
+  // 플랫폼 카테고리
+  categoryCode    String?  // 플랫폼 카테고리 코드
+  categoryName    String?  // 플랫폼 카테고리명
+
+  // 상태
+  status          PlatformProductStatus @default(PENDING)
+  statusMessage   String?  // 상태 메시지 (오류 등)
+
+  // 동기화 정보
+  lastSyncedAt    DateTime?
+  lastSyncError   String?
+
+  // 업로드 로그
+  uploadLogs      ProductUploadLog[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([masterProductId, platform])
+  @@index([platform, status])
+  @@map("platform_products")
+}
+
+enum Platform {
+  COUPANG    // 쿠팡
+  NAVER      // 네이버 스마트스토어
+  SHOP       // 자사몰
+}
+
+enum PlatformProductStatus {
+  PENDING     // 대기 중
+  UPLOADING   // 업로드 중
+  REGISTERED  // 등록 완료
+  ACTIVE      // 판매 중
+  PAUSED      // 판매 중지
+  REJECTED    // 반려됨
+  ERROR       // 오류
+  DELETED     // 삭제됨
+}
+
+// 플랫폼 카테고리 매핑
+model CategoryMapping {
+  id              String   @id @default(cuid())
+
+  // 내부 카테고리
+  shopCategoryId  String
+  shopCategory    ShopCategory @relation(fields: [shopCategoryId], references: [id], onDelete: Cascade)
+
+  // 플랫폼
+  platform        Platform
+
+  // 플랫폼 카테고리 정보
+  platformCategoryCode String
+  platformCategoryName String
+
+  // 상품 고시 정보 템플릿
+  noticeTemplate  Json     @default("{}")
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([shopCategoryId, platform])
+  @@map("category_mappings")
+}
+
+// 플랫폼 설정 (API 인증 정보 등)
+model PlatformConfig {
+  id              String   @id @default(cuid())
+
+  // 사용자
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // 플랫폼
+  platform        Platform
+
+  // 인증 정보 (암호화 저장)
+  credentials     Json     // { accessKey, secretKey, vendorId } 등
+
+  // 판매자 정보
+  sellerId        String?  // 쿠팡: vendorId, 네이버: accountNo
+  sellerName      String?
+
+  // 출고지/반품지 정보
+  outboundCode    String?  // 출고지 코드
+  returnCode      String?  // 반품지 코드
+
+  // 상태
+  isActive        Boolean  @default(true)
+  lastVerifiedAt  DateTime?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([userId, platform])
+  @@map("platform_configs")
+}
+
+// 상품 업로드 로그
+model ProductUploadLog {
+  id              String   @id @default(cuid())
+
+  // 마스터 상품
+  masterProductId String
+  masterProduct   MasterProduct @relation(fields: [masterProductId], references: [id], onDelete: Cascade)
+
+  // 플랫폼 상품 (등록 성공 시)
+  platformProductId String?
+  platformProduct   PlatformProduct? @relation(fields: [platformProductId], references: [id], onDelete: SetNull)
+
+  // 플랫폼
+  platform        Platform
+
+  // 작업 유형
+  action          UploadAction
+
+  // 결과
+  status          UploadLogStatus @default(PENDING)
+  message         String?
+  errorDetail     String?  @db.Text
+
+  // 요청/응답 데이터 (디버깅용)
+  requestData     Json?
+  responseData    Json?
+
+  startedAt       DateTime @default(now())
+  completedAt     DateTime?
+
+  @@index([masterProductId, platform])
+  @@index([status, startedAt])
+  @@map("product_upload_logs")
+}
+
+enum UploadAction {
+  CREATE   // 신규 등록
+  UPDATE   // 수정
+  DELETE   // 삭제
+  SYNC     // 동기화
+}
+
+enum UploadLogStatus {
+  PENDING    // 대기
+  RUNNING    // 진행 중
+  SUCCESS    // 성공
+  FAILED     // 실패
+  CANCELLED  // 취소
 }
 
 // ============================================

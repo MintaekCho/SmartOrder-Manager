@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useSystemMode } from '@/contexts/SystemModeContext';
+import { useFeatureSettings } from '@/contexts/FeatureSettingsContext';
 import {
   LayoutDashboard,
   Package,
@@ -24,10 +24,11 @@ import {
   FileText,
   Boxes,
   Receipt,
-  CreditCard,
   Store,
   Users,
   ShoppingBag,
+  Layers,
+  Globe,
 } from 'lucide-react';
 
 interface MenuItem {
@@ -42,9 +43,9 @@ export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [expandedMenus, setExpandedMenus] = useState<Set<string>>(new Set());
   const pathname = usePathname();
-  const { settings, isFeatureEnabled, getModeLabel } = useSystemMode();
+  const { features, isFeatureEnabled } = useFeatureSettings();
 
-  // 시스템 모드에 따른 메뉴 구성
+  // 기능 설정에 따른 메뉴 구성
   const menuItems: MenuItem[] = useMemo(() => {
     const items: MenuItem[] = [
       {
@@ -54,7 +55,7 @@ export default function Sidebar() {
       },
     ];
 
-    // 위탁판매 기능 메뉴 (소싱) - 위탁판매/통합 모드
+    // 상품 소싱 기능
     if (isFeatureEnabled('sourcing')) {
       items.push({
         name: '상품 소싱',
@@ -70,12 +71,29 @@ export default function Sidebar() {
       });
     }
 
-    // 상품 관리 - 위탁판매/통합 모드에서만 (쿠팡 상품 등록 관련)
-    if (settings.mode === 'dropshipping' || settings.mode === 'hybrid') {
+    // 통합 상품 관리 (멀티 플랫폼)
+    if (isFeatureEnabled('multiPlatform')) {
       items.push({
-        name: '상품 관리',
+        name: '통합 상품',
+        href: '/products/multi',
+        icon: <Globe size={20} />,
+        featureKey: 'multiPlatform',
+        children: [
+          { name: '마스터 상품', href: '/products/multi' },
+          { name: '일괄 등록', href: '/products/multi/upload' },
+          { name: '플랫폼 현황', href: '/products/multi/status' },
+          { name: '플랫폼 설정', href: '/products/multi/settings' },
+        ],
+      });
+    }
+
+    // 쿠팡 상품 관리 (레거시)
+    if (isFeatureEnabled('coupangProducts')) {
+      items.push({
+        name: '쿠팡 상품',
         href: '/products',
         icon: <Package size={20} />,
+        featureKey: 'coupangProducts',
         children: [
           { name: '상세페이지 에디터', href: '/products/detail-editor' },
           { name: '상품 등록', href: '/products/register' },
@@ -84,34 +102,71 @@ export default function Sidebar() {
       });
     }
 
-    // 자사몰 관리 메뉴 (재고관리/통합 모드)
+    // 쿠팡 주문/배송
+    if (isFeatureEnabled('coupangOrders')) {
+      items.push({
+        name: '쿠팡 주문',
+        href: '/orders',
+        icon: <ShoppingCart size={20} />,
+        featureKey: 'coupangOrders',
+        children: [
+          { name: '주문 목록', href: '/orders' },
+          { name: '발주 처리', href: '/orders/fulfillment' },
+          { name: '배송 추적', href: '/orders/tracking' },
+          { name: '반품/환불', href: '/orders/returns' },
+        ],
+      });
+    }
+
+    // 자사몰 상품 관리
+    if (isFeatureEnabled('shopProducts') || isFeatureEnabled('shopCategories') || isFeatureEnabled('shopOrders') || isFeatureEnabled('shopCustomers')) {
+      const shopChildren: { name: string; href: string }[] = [];
+
+      if (isFeatureEnabled('shopProducts')) {
+        shopChildren.push({ name: '상품 관리', href: '/shop/products' });
+      }
+      if (isFeatureEnabled('shopCategories')) {
+        shopChildren.push({ name: '카테고리 관리', href: '/shop/categories' });
+      }
+      if (isFeatureEnabled('shopOrders')) {
+        shopChildren.push({ name: '주문 관리', href: '/shop/orders' });
+      }
+      if (isFeatureEnabled('shopCustomers')) {
+        shopChildren.push({ name: '고객 관리', href: '/shop/customers' });
+      }
+
+      if (shopChildren.length > 0) {
+        items.push({
+          name: '자사몰',
+          href: '/shop',
+          icon: <Store size={20} />,
+          children: shopChildren,
+        });
+      }
+    }
+
+    // 재고 관리
     if (isFeatureEnabled('inventory')) {
-      const shopChildren: { name: string; href: string }[] = [
-        { name: '상품 관리', href: '/shop/products' },
-        { name: '카테고리 관리', href: '/shop/categories' },
-        { name: '주문 관리', href: '/shop/orders' },
-        { name: '고객 관리', href: '/shop/customers' },
+      const inventoryChildren: { name: string; href: string }[] = [
+        { name: '재고 현황', href: '/inventory' },
       ];
 
-      // 재고 관련 기능
-      shopChildren.push({ name: '재고 현황', href: '/inventory' });
-
       if (isFeatureEnabled('stockIn')) {
-        shopChildren.push({ name: '입고 관리', href: '/inventory/stock-in' });
+        inventoryChildren.push({ name: '입고 관리', href: '/inventory/stock-in' });
       }
       if (isFeatureEnabled('stockOut')) {
-        shopChildren.push({ name: '출고 관리', href: '/inventory/stock-out' });
+        inventoryChildren.push({ name: '출고 관리', href: '/inventory/stock-out' });
       }
       if (isFeatureEnabled('stockCount')) {
-        shopChildren.push({ name: '재고 실사', href: '/inventory/stock-count' });
+        inventoryChildren.push({ name: '재고 실사', href: '/inventory/stock-count' });
       }
 
       items.push({
-        name: '자사몰 관리',
-        href: '/shop',
-        icon: <Store size={20} />,
+        name: '재고 관리',
+        href: '/inventory',
+        icon: <Boxes size={20} />,
         featureKey: 'inventory',
-        children: shopChildren,
+        children: inventoryChildren,
       });
     }
 
@@ -129,7 +184,7 @@ export default function Sidebar() {
       });
     }
 
-    // 발주 관리 (재고관리 모드 - 구매 발주)
+    // 발주 관리
     if (isFeatureEnabled('purchaseOrder')) {
       items.push({
         name: '발주 관리',
@@ -143,61 +198,36 @@ export default function Sidebar() {
       });
     }
 
-    // 주문/배송 - 위탁판매/통합 모드에서만 (쿠팡 주문 관련)
-    if (settings.mode === 'dropshipping' || settings.mode === 'hybrid') {
-      items.push({
-        name: '주문/배송',
-        href: '/orders',
-        icon: <ShoppingCart size={20} />,
-        children: [
-          { name: '주문 목록', href: '/orders' },
-          { name: '발주 처리', href: '/orders/fulfillment' },
-          { name: '배송 추적', href: '/orders/tracking' },
-          { name: '반품/환불', href: '/orders/returns' },
-        ],
-      });
-    }
-
-    // 공급처 관리 (위탁판매)
-    if (isFeatureEnabled('sourcing') || isFeatureEnabled('autoOrder')) {
+    // 공급처 관리
+    if (isFeatureEnabled('suppliers')) {
       items.push({
         name: '공급처 관리',
         href: '/suppliers',
         icon: <Building2 size={20} />,
+        featureKey: 'suppliers',
       });
     }
 
-    // 정산 관리 - 위탁판매/통합 모드에서만 (쿠팡 정산)
-    if (settings.mode === 'dropshipping' || settings.mode === 'hybrid') {
+    // 정산 관리
+    if (isFeatureEnabled('settlements')) {
       items.push({
         name: '정산 관리',
         href: '/settlements',
-        icon: <BarChart3 size={20} />,
-      });
-    }
-
-    // 매입/매출 관리 - 재고관리/통합 모드에서만
-    if (settings.mode === 'inventory' || settings.mode === 'hybrid') {
-      items.push({
-        name: '매입/매출',
-        href: '/accounting',
         icon: <Receipt size={20} />,
-        children: [
-          { name: '매입 관리', href: '/accounting/purchases' },
-          { name: '매출 관리', href: '/accounting/sales' },
-          { name: '거래처 관리', href: '/accounting/vendors' },
-          { name: '수익 분석', href: '/accounting/analysis' },
-        ],
+        featureKey: 'settlements',
       });
     }
 
-    // 도구 - 위탁판매/통합 모드에서만
-    if (settings.mode === 'dropshipping' || settings.mode === 'hybrid') {
+    // 도구
+    if (isFeatureEnabled('tools') || isFeatureEnabled('marginCalc')) {
       const toolChildren: { name: string; href: string }[] = [];
+
       if (isFeatureEnabled('marginCalc')) {
         toolChildren.push({ name: '마진 계산기', href: '/tools/margin-calculator' });
       }
-      toolChildren.push({ name: 'AI 썸네일', href: '/tools/ai-thumbnail' });
+      if (isFeatureEnabled('tools')) {
+        toolChildren.push({ name: 'AI 썸네일', href: '/tools/ai-thumbnail' });
+      }
 
       if (toolChildren.length > 0) {
         items.push({
@@ -210,13 +240,16 @@ export default function Sidebar() {
     }
 
     // 리포트
-    items.push({
-      name: '리포트',
-      href: '/reports',
-      icon: <BarChart3 size={20} />,
-    });
+    if (isFeatureEnabled('reports')) {
+      items.push({
+        name: '리포트',
+        href: '/reports',
+        icon: <BarChart3 size={20} />,
+        featureKey: 'reports',
+      });
+    }
 
-    // 설정
+    // 설정 (항상 표시)
     items.push({
       name: '설정',
       href: '/settings',
@@ -224,7 +257,7 @@ export default function Sidebar() {
     });
 
     return items;
-  }, [settings.mode, settings.features, isFeatureEnabled]);
+  }, [features, isFeatureEnabled]);
 
   // 현재 경로에 해당하는 메뉴를 자동으로 펼침
   useEffect(() => {
@@ -266,18 +299,13 @@ export default function Sidebar() {
     return pathname === href;
   };
 
-  // 모드별 색상
-  const getModeColor = () => {
-    switch (settings.mode) {
-      case 'dropshipping':
-        return 'bg-blue-500';
-      case 'inventory':
-        return 'bg-green-500';
-      case 'hybrid':
-        return 'bg-purple-500';
-      default:
-        return 'bg-[var(--color-primary-500)]';
-    }
+  // 활성화된 기능 수에 따른 색상
+  const getActiveColor = () => {
+    const activeCount = Object.values(features).filter(Boolean).length;
+    if (activeCount >= 15) return 'bg-purple-500';
+    if (activeCount >= 10) return 'bg-blue-500';
+    if (activeCount >= 5) return 'bg-green-500';
+    return 'bg-gray-500';
   };
 
   return (
@@ -290,7 +318,7 @@ export default function Sidebar() {
       <div className="h-16 flex items-center justify-between px-4 border-b border-[var(--color-gray-300)]">
         {!collapsed && (
           <Link href="/" className="flex items-center gap-2">
-            <div className={`w-8 h-8 rounded-lg ${getModeColor()} flex items-center justify-center`}>
+            <div className={`w-8 h-8 rounded-lg ${getActiveColor()} flex items-center justify-center`}>
               <TrendingUp size={18} className="text-white" />
             </div>
             <div className="flex flex-col">
@@ -298,7 +326,7 @@ export default function Sidebar() {
                 SmartOrder
               </span>
               <span className="text-[10px] text-[var(--color-gray-500)]">
-                {getModeLabel(settings.mode)} 모드
+                {Object.values(features).filter(Boolean).length}개 기능 사용 중
               </span>
             </div>
           </Link>

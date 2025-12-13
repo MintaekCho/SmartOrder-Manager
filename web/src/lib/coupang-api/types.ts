@@ -8,59 +8,79 @@ export interface CoupangCredentials {
 
 // 상품 관련
 export interface CoupangProduct {
-  sellerProductId: string;
+  sellerProductId?: string; // 등록 시에는 없음, 조회 시에만 존재
   sellerProductName: string;
   displayCategoryCode: number;
-  categoryId: string;
-  productGroup: string;
-  brand: string;
-  manufacture: string;
-  deliveryMethod: 'DIRECT' | 'VENDOR_FULFILLMENT';
-  deliveryCompanyCode: string;
-  deliveryChargeType: 'FREE' | 'PAID';
+  categoryId?: number | string;
+  productGroup?: string;
+  brand?: string;
+  generalProductName?: string;
+  manufacture?: string | { manufacturerCode?: string; manufacturingDate?: string; releaseDate?: string };
+  deliveryMethod?: 'DIRECT' | 'VENDOR_FULFILLMENT';
+  deliveryCompanyCode?: string;
+  deliveryChargeType: 'FREE' | 'NOT_FREE' | 'CONDITIONAL_FREE' | 'CHARGE_RECEIVED' | 'PAID';
   deliveryCharge?: number;
   freeShipOverAmount?: number;
-  returnCenterCode: string;
-  returnCharge: number;
-  outboundShippingPlaceCode: string;
-  vendorUserId: string;
+  deliveryChargeOnReturn?: number;
+  remoteAreaDeliverable?: string;
+  unionDeliveryType?: string;
+  returnCenterCode?: string;
+  returnChargeName?: string;
+  companyContactNumber?: string;
+  returnZipCode?: string;
+  returnAddress?: string;
+  returnAddressDetail?: string;
+  returnCharge?: number;
+  returnChargeVendor?: string;
+  afterServiceInformation?: string;
+  afterServiceContactNumber?: string;
+  outboundShippingPlaceCode?: string;
+  vendorId?: string;
+  vendorUserId?: string;
+  requested?: boolean;
   items: CoupangProductItem[];
   requiredDocuments?: RequiredDocument[];
+  extraInfos?: unknown[];
   extraInfoMessage?: string;
   requestedIpdDate?: string;
 }
 
 export interface CoupangProductItem {
-  sellerProductItemId: string;
-  itemName: string;
+  sellerProductItemId?: string; // 등록 시에는 없음
+  sellerProductItemName?: string;
+  itemName?: string;
   originalPrice: number;
   salePrice: number;
-  maximumBuyCount: number;
+  maximumBuyCount?: number;
   maximumBuyForPerson?: number;
-  outboundShippingTimeDay: number;
-  unitCount: number;
-  adultOnly: 'Y' | 'N';
-  taxType: 'TAX' | 'FREE';
-  parallelImported: 'Y' | 'N';
-  overseasPurchased: 'Y' | 'N';
-  externalVendorSku: string;
+  maximumBuyForPersonPeriod?: number;
+  outboundShippingTimeDay?: number;
+  unitCount?: number;
+  adultOnly?: 'Y' | 'N' | 'EVERYONE';
+  taxType?: 'TAX' | 'FREE';
+  parallelImported?: 'Y' | 'N' | 'NOT_PARALLEL_IMPORTED';
+  overseasPurchased?: 'Y' | 'N' | 'NOT_OVERSEAS_PURCHASED';
+  pccNeeded?: boolean;
+  bestPriceGuaranteed3P?: boolean;
+  externalVendorSku?: string;
   barcode?: string;
-  emptyBarcode: boolean;
+  emptyBarcode?: boolean;
   emptyBarcodeReason?: string;
   modelNo?: string;
-  images: ProductImage[];
+  images?: ProductImage[];
   attributes?: ProductAttribute[];
   contents?: ProductContent[];
-  offerCondition: 'NEW' | 'REFURBISHED';
+  certifications?: Certification[];
+  extraInfos?: unknown[];
+  notices?: Notice[];
+  offerCondition?: 'NEW' | 'REFURBISHED';
   offerDescription?: string;
   searchTags?: string[];
-  certifications?: Certification[];
-  notices?: Notice[];
 }
 
 export interface ProductImage {
   imageOrder: number;
-  imageType: 'REPRESENTATION' | 'DETAIL';
+  imageType: 'REPRESENTATIVE' | 'REPRESENTATION' | 'DETAIL';
   cdnPath: string;
   vendorPath: string;
 }

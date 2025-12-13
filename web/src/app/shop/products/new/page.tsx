@@ -21,6 +21,11 @@ import {
   Eye,
   Smartphone,
   Monitor,
+  GripVertical,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  RotateCcw,
 } from 'lucide-react';
 import { Dropdown } from '@/components/ui/Dropdown';
 
@@ -58,6 +63,22 @@ interface ImageValidation {
   width?: number;
   height?: number;
 }
+
+// 임시저장 데이터 타입 (이미지 제외 - 파일은 저장 불가)
+interface DraftData {
+  productName: string;
+  categoryId: string;
+  description: string;
+  options: Omit<ProductOption, 'images' | 'detailImages'>[];
+  imageMode: 'same' | 'perOption';
+  detailMode: 'same' | 'perOption';
+  commonDetailContent: string;
+  isShopVisible: boolean;
+  currentStep: number;
+  savedAt: string;
+}
+
+const DRAFT_STORAGE_KEY = 'shop-product-draft';
 
 // 상세페이지 이미지 밸리데이션
 const validateDetailImage = (file: File): Promise<ImageValidation> => {
@@ -158,6 +179,19 @@ export default function NewShopProductPage() {
   const [showPreview, setShowPreview] = useState(false);
   const [previewDevice, setPreviewDevice] = useState<'mobile' | 'desktop'>('mobile');
 
+  // 임시저장 상태
+  const [hasDraft, setHasDraft] = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
+  const [showDraftModal, setShowDraftModal] = useState(false);
+  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // 드래그앤드롭 상태
+  const [draggedImageIndex, setDraggedImageIndex] = useState<number | null>(null);
+  const [dragOverImageIndex, setDragOverImageIndex] = useState<number | null>(null);
+  const [draggedDetailIndex, setDraggedDetailIndex] = useState<number | null>(null);
+  const [dragOverDetailIndex, setDragOverDetailIndex] = useState<number | null>(null);
+
   // 카테고리 로드
   useEffect(() => {
     const fetchCategories = async () => {
@@ -175,6 +209,116 @@ export default function NewShopProductPage() {
     };
     fetchCategories();
   }, []);
+
+  // 임시저장 데이터 생성
+  const createDraftData = (): DraftData => ({
+    productName,
+    categoryId,
+    description,
+    options: options.map(({ images, detailImages, ...rest }) => rest),
+    imageMode,
+    detailMode,
+    commonDetailContent,
+    isShopVisible,
+    currentStep,
+    savedAt: new Date().toISOString(),
+  });
+
+  // 임시저장
+  const saveDraft = () => {
+    try {
+      setIsSavingDraft(true);
+      const draftData = createDraftData();
+      localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draftData));
+      setLastSavedAt(draftData.savedAt);
+      setHasDraft(true);
+    } catch (error) {
+      console.error('임시저장 실패:', error);
+    } finally {
+      setIsSavingDraft(false);
+    }
+  };
+
+  // 임시저장 불러오기
+  const loadDraft = () => {
+    try {
+      const stored = localStorage.getItem(DRAFT_STORAGE_KEY);
+      if (!stored) return null;
+      return JSON.parse(stored) as DraftData;
+    } catch (error) {
+      console.error('임시저장 불러오기 실패:', error);
+      return null;
+    }
+  };
+
+  // 임시저장 적용
+  const applyDraft = (draft: DraftData) => {
+    setProductName(draft.productName);
+    setCategoryId(draft.categoryId);
+    setDescription(draft.description);
+    setOptions(draft.options.map(opt => ({ ...opt, images: [], detailImages: [] })));
+    setImageMode(draft.imageMode);
+    setDetailMode(draft.detailMode);
+    setCommonDetailContent(draft.commonDetailContent);
+    setIsShopVisible(draft.isShopVisible);
+    setCurrentStep(draft.currentStep);
+    setShowDraftModal(false);
+  };
+
+  // 임시저장 삭제
+  const clearDraft = () => {
+    localStorage.removeItem(DRAFT_STORAGE_KEY);
+    setHasDraft(false);
+    setLastSavedAt(null);
+  };
+
+  // 초기 로드 시 임시저장 확인
+  useEffect(() => {
+    const draft = loadDraft();
+    if (draft) {
+      setHasDraft(true);
+      setLastSavedAt(draft.savedAt);
+      // 작성 내용이 있는 경우에만 모달 표시
+      if (draft.productName || draft.categoryId || draft.options.some(o => o.name)) {
+        setShowDraftModal(true);
+      }
+    }
+  }, []);
+
+  // 자동 임시저장 (30초마다, 변경사항이 있을 때)
+  useEffect(() => {
+    // 저장할 내용이 있는 경우에만 자동 저장
+    const hasContent = productName || categoryId || options.some(o => o.name);
+    if (!hasContent) return;
+
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+    }
+
+    autoSaveTimerRef.current = setTimeout(() => {
+      saveDraft();
+    }, 30000); // 30초
+
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+    };
+  }, [productName, categoryId, description, options, imageMode, detailMode, commonDetailContent, isShopVisible, currentStep]);
+
+  // 시간 포맷팅
+  const formatSavedTime = (isoString: string) => {
+    const date = new Date(isoString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+
+    if (diffMins < 1) return '방금 전';
+    if (diffMins < 60) return `${diffMins}분 전`;
+    if (diffHours < 24) return `${diffHours}시간 전`;
+    return date.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  };
 
   // 옵션 추가
   const addOption = () => {
@@ -245,24 +389,56 @@ export default function NewShopProductPage() {
     setOptions([...options, newOption]);
   };
 
-  // 이미지 업로드 (공통)
+  // 이미지 업로드 (공통) - 최대 5MB
   const handleCommonImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
 
-    const newImages = Array.from(files).map((file) => ({
+    const maxFileSize = 5 * 1024 * 1024; // 5MB
+    const validFiles: File[] = [];
+    const invalidFiles: string[] = [];
+
+    Array.from(files).forEach((file) => {
+      if (file.size > maxFileSize) {
+        invalidFiles.push(`${file.name} (${(file.size / 1024 / 1024).toFixed(1)}MB)`);
+      } else {
+        validFiles.push(file);
+      }
+    });
+
+    if (invalidFiles.length > 0) {
+      alert(`다음 파일은 5MB를 초과하여 업로드할 수 없습니다:\n${invalidFiles.join('\n')}`);
+    }
+
+    const newImages = validFiles.map((file) => ({
       file,
       preview: URL.createObjectURL(file),
     }));
     setCommonImages([...commonImages, ...newImages]);
   };
 
-  // 이미지 업로드 (옵션별)
+  // 이미지 업로드 (옵션별) - 최대 5MB
   const handleOptionImageUpload = (optionId: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
 
-    const newImages = Array.from(files).map((file) => ({
+    const maxFileSize = 5 * 1024 * 1024; // 5MB
+    const validFiles: File[] = [];
+    const invalidFiles: string[] = [];
+
+    Array.from(files).forEach((file) => {
+      if (file.size > maxFileSize) {
+        invalidFiles.push(`${file.name} (${(file.size / 1024 / 1024).toFixed(1)}MB)`);
+      } else {
+        validFiles.push(file);
+      }
+    });
+
+    if (invalidFiles.length > 0) {
+      alert(`다음 파일은 5MB를 초과하여 업로드할 수 없습니다:\n${invalidFiles.join('\n')}`);
+    }
+
+    const newImages = validFiles.map((file) => ({
       file,
       preview: URL.createObjectURL(file),
     }));
@@ -319,6 +495,74 @@ export default function NewShopProductPage() {
     } else {
       setCommonDetailImages(commonDetailImages.filter((_, i) => i !== index));
     }
+  };
+
+  // 공통 이미지 순서 변경 (버튼)
+  const moveCommonImage = (fromIndex: number, toIndex: number) => {
+    if (toIndex < 0 || toIndex >= commonImages.length) return;
+    const newImages = [...commonImages];
+    const [movedImage] = newImages.splice(fromIndex, 1);
+    newImages.splice(toIndex, 0, movedImage);
+    setCommonImages(newImages);
+  };
+
+  // 공통 이미지 드래그앤드롭
+  const handleImageDragStart = (index: number) => {
+    setDraggedImageIndex(index);
+  };
+
+  const handleImageDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    setDragOverImageIndex(index);
+  };
+
+  const handleImageDragEnd = () => {
+    if (draggedImageIndex !== null && dragOverImageIndex !== null && draggedImageIndex !== dragOverImageIndex) {
+      moveCommonImage(draggedImageIndex, dragOverImageIndex);
+    }
+    setDraggedImageIndex(null);
+    setDragOverImageIndex(null);
+  };
+
+  // 옵션별 이미지 순서 변경
+  const moveOptionImage = (optionId: string, fromIndex: number, toIndex: number) => {
+    setOptions(
+      options.map((opt) => {
+        if (opt.id !== optionId || !opt.images) return opt;
+        if (toIndex < 0 || toIndex >= opt.images.length) return opt;
+        const newImages = [...opt.images];
+        const [movedImage] = newImages.splice(fromIndex, 1);
+        newImages.splice(toIndex, 0, movedImage);
+        return { ...opt, images: newImages };
+      })
+    );
+  };
+
+  // 상세페이지 이미지 순서 변경 (버튼)
+  const moveDetailImage = (fromIndex: number, toIndex: number) => {
+    if (toIndex < 0 || toIndex >= commonDetailImages.length) return;
+    const newImages = [...commonDetailImages];
+    const [movedImage] = newImages.splice(fromIndex, 1);
+    newImages.splice(toIndex, 0, movedImage);
+    setCommonDetailImages(newImages);
+  };
+
+  // 상세페이지 이미지 드래그앤드롭
+  const handleDetailDragStart = (index: number) => {
+    setDraggedDetailIndex(index);
+  };
+
+  const handleDetailDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    setDragOverDetailIndex(index);
+  };
+
+  const handleDetailDragEnd = () => {
+    if (draggedDetailIndex !== null && dragOverDetailIndex !== null && draggedDetailIndex !== dragOverDetailIndex) {
+      moveDetailImage(draggedDetailIndex, dragOverDetailIndex);
+    }
+    setDraggedDetailIndex(null);
+    setDragOverDetailIndex(null);
   };
 
   // 가격 포맷
@@ -412,6 +656,9 @@ export default function NewShopProductPage() {
         throw new Error(result.error || '상품 등록에 실패했습니다.');
       }
 
+      // 상품 등록 성공 시 임시저장 삭제
+      clearDraft();
+
       alert('상품이 등록되었습니다.');
       router.push('/shop/products');
     } catch (error) {
@@ -453,25 +700,49 @@ export default function NewShopProductPage() {
               </div>
             </div>
 
-            {/* 노출 설정 */}
-            <label className="flex items-center gap-2 cursor-pointer">
-              <span className="text-sm text-[var(--color-gray-600)]">자사몰 노출</span>
-              <div className="relative">
-                <input
-                  type="checkbox"
-                  checked={isShopVisible}
-                  onChange={(e) => setIsShopVisible(e.target.checked)}
-                  className="sr-only"
-                />
-                <div className={`w-10 h-5 rounded-full transition-colors ${
-                  isShopVisible ? 'bg-[var(--color-primary-500)]' : 'bg-[var(--color-gray-300)]'
-                }`}>
-                  <div className={`w-4 h-4 bg-white rounded-full shadow transform transition-transform ${
-                    isShopVisible ? 'translate-x-5' : 'translate-x-0.5'
-                  } mt-0.5`} />
-                </div>
+            {/* 오른쪽 액션들 */}
+            <div className="flex items-center gap-4">
+              {/* 임시저장 버튼 */}
+              <div className="flex items-center gap-2">
+                {lastSavedAt && (
+                  <span className="text-xs text-[var(--color-gray-500)]">
+                    {formatSavedTime(lastSavedAt)} 저장됨
+                  </span>
+                )}
+                <button
+                  onClick={saveDraft}
+                  disabled={isSavingDraft}
+                  className="flex items-center gap-1.5 px-3 py-1.5 border border-[var(--color-gray-300)] text-[var(--color-gray-700)] rounded-lg hover:bg-[var(--color-gray-50)] disabled:opacity-50 transition-colors text-sm"
+                >
+                  {isSavingDraft ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <Clock size={14} />
+                  )}
+                  임시저장
+                </button>
               </div>
-            </label>
+
+              {/* 노출 설정 */}
+              <label className="flex items-center gap-2 cursor-pointer">
+                <span className="text-sm text-[var(--color-gray-600)]">자사몰 노출</span>
+                <div className="relative">
+                  <input
+                    type="checkbox"
+                    checked={isShopVisible}
+                    onChange={(e) => setIsShopVisible(e.target.checked)}
+                    className="sr-only"
+                  />
+                  <div className={`w-10 h-5 rounded-full transition-colors ${
+                    isShopVisible ? 'bg-[var(--color-primary-500)]' : 'bg-[var(--color-gray-300)]'
+                  }`}>
+                    <div className={`w-4 h-4 bg-white rounded-full shadow transform transition-transform ${
+                      isShopVisible ? 'translate-x-5' : 'translate-x-0.5'
+                    } mt-0.5`} />
+                  </div>
+                </div>
+              </label>
+            </div>
           </div>
 
           {/* Progress Steps */}
@@ -840,16 +1111,63 @@ export default function NewShopProductPage() {
               {/* 공통 이미지 업로드 */}
               {imageMode === 'same' && (
                 <div>
+                  {commonImages.length > 1 && (
+                    <p className="text-xs text-[var(--color-gray-500)] mb-3">
+                      드래그하여 순서를 변경하거나 화살표 버튼을 사용하세요. 첫 번째 이미지가 대표 이미지가 됩니다.
+                    </p>
+                  )}
                   <div className="grid grid-cols-5 gap-4">
                     {commonImages.map((image, index) => (
-                      <div key={index} className="relative aspect-square rounded-lg overflow-hidden border border-[var(--color-gray-200)]">
+                      <div
+                        key={index}
+                        draggable
+                        onDragStart={() => handleImageDragStart(index)}
+                        onDragOver={(e) => handleImageDragOver(e, index)}
+                        onDragEnd={handleImageDragEnd}
+                        className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all cursor-grab active:cursor-grabbing ${
+                          dragOverImageIndex === index
+                            ? 'border-[var(--color-primary-500)] scale-105'
+                            : draggedImageIndex === index
+                            ? 'opacity-50 border-[var(--color-gray-300)]'
+                            : 'border-[var(--color-gray-200)]'
+                        }`}
+                      >
                         <img src={image.preview} alt={`상품 이미지 ${index + 1}`} className="w-full h-full object-cover" />
+                        {/* 드래그 핸들 */}
+                        <div className="absolute top-1 left-1 p-1 bg-black/50 rounded text-white">
+                          <GripVertical size={14} />
+                        </div>
+                        {/* 삭제 버튼 */}
                         <button
                           onClick={() => setCommonImages(commonImages.filter((_, i) => i !== index))}
                           className="absolute top-1 right-1 p-1 bg-black/50 rounded-full text-white hover:bg-black/70"
                         >
                           <X size={14} />
                         </button>
+                        {/* 순서 변경 버튼 */}
+                        {commonImages.length > 1 && (
+                          <div className="absolute bottom-1 right-1 flex gap-0.5">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); moveCommonImage(index, index - 1); }}
+                              disabled={index === 0}
+                              className={`p-1 rounded text-white transition-colors ${
+                                index === 0 ? 'bg-black/30 cursor-not-allowed' : 'bg-black/50 hover:bg-black/70'
+                              }`}
+                            >
+                              <ChevronLeft size={12} />
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); moveCommonImage(index, index + 1); }}
+                              disabled={index === commonImages.length - 1}
+                              className={`p-1 rounded text-white transition-colors ${
+                                index === commonImages.length - 1 ? 'bg-black/30 cursor-not-allowed' : 'bg-black/50 hover:bg-black/70'
+                              }`}
+                            >
+                              <ChevronRight size={12} />
+                            </button>
+                          </div>
+                        )}
+                        {/* 대표 이미지 표시 */}
                         {index === 0 && (
                           <span className="absolute bottom-1 left-1 px-2 py-0.5 bg-[var(--color-primary-500)] text-white text-[10px] rounded">
                             대표
@@ -885,8 +1203,9 @@ export default function NewShopProductPage() {
                       </div>
                       <div className="grid grid-cols-6 gap-3">
                         {(option.images || []).map((image, index) => (
-                          <div key={index} className="relative aspect-square rounded-lg overflow-hidden border border-[var(--color-gray-200)]">
+                          <div key={index} className="relative aspect-square rounded-lg overflow-hidden border border-[var(--color-gray-200)] group">
                             <img src={image.preview} alt={`${option.name} 이미지 ${index + 1}`} className="w-full h-full object-cover" />
+                            {/* 삭제 버튼 */}
                             <button
                               onClick={() => setOptions(
                                 options.map((opt) =>
@@ -899,6 +1218,35 @@ export default function NewShopProductPage() {
                             >
                               <X size={12} />
                             </button>
+                            {/* 순서 변경 버튼 */}
+                            {(option.images?.length || 0) > 1 && (
+                              <div className="absolute bottom-1 right-1 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); moveOptionImage(option.id, index, index - 1); }}
+                                  disabled={index === 0}
+                                  className={`p-0.5 rounded text-white transition-colors ${
+                                    index === 0 ? 'bg-black/30 cursor-not-allowed' : 'bg-black/50 hover:bg-black/70'
+                                  }`}
+                                >
+                                  <ChevronLeft size={10} />
+                                </button>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); moveOptionImage(option.id, index, index + 1); }}
+                                  disabled={index === (option.images?.length || 0) - 1}
+                                  className={`p-0.5 rounded text-white transition-colors ${
+                                    index === (option.images?.length || 0) - 1 ? 'bg-black/30 cursor-not-allowed' : 'bg-black/50 hover:bg-black/70'
+                                  }`}
+                                >
+                                  <ChevronRight size={10} />
+                                </button>
+                              </div>
+                            )}
+                            {/* 첫 번째 이미지 표시 */}
+                            {index === 0 && (
+                              <span className="absolute bottom-1 left-1 px-1.5 py-0.5 bg-[var(--color-primary-500)] text-white text-[9px] rounded">
+                                대표
+                              </span>
+                            )}
                           </div>
                         ))}
                         <label className="aspect-square rounded-lg border-2 border-dashed border-[var(--color-gray-300)] flex flex-col items-center justify-center cursor-pointer hover:border-[var(--color-primary-500)] transition-colors">
@@ -1003,11 +1351,66 @@ export default function NewShopProductPage() {
                     </div>
 
                     {/* 이미지 목록 */}
+                    {commonDetailImages.length > 1 && (
+                      <p className="text-xs text-[var(--color-gray-500)] mb-2">
+                        드래그하여 순서를 변경하거나 화살표 버튼을 사용하세요.
+                      </p>
+                    )}
                     <div className="space-y-3 mb-4">
                       {commonDetailImages.map((img, index) => (
-                        <div key={index} className={`flex items-start gap-4 p-3 rounded-lg border ${
-                          img.validation.valid ? 'border-[var(--color-gray-200)]' : 'border-red-300 bg-red-50'
-                        }`}>
+                        <div
+                          key={index}
+                          draggable
+                          onDragStart={() => handleDetailDragStart(index)}
+                          onDragOver={(e) => handleDetailDragOver(e, index)}
+                          onDragEnd={handleDetailDragEnd}
+                          className={`flex items-start gap-4 p-3 rounded-lg border-2 transition-all cursor-grab active:cursor-grabbing ${
+                            dragOverDetailIndex === index
+                              ? 'border-[var(--color-primary-500)] bg-[var(--color-primary-50)]'
+                              : draggedDetailIndex === index
+                              ? 'opacity-50 border-[var(--color-gray-300)]'
+                              : img.validation.valid
+                              ? 'border-[var(--color-gray-200)]'
+                              : 'border-red-300 bg-red-50'
+                          }`}
+                        >
+                          {/* 드래그 핸들 */}
+                          <div className="flex items-center justify-center text-[var(--color-gray-400)] hover:text-[var(--color-gray-600)]">
+                            <GripVertical size={20} />
+                          </div>
+                          {/* 순서 번호 */}
+                          <div className="flex flex-col items-center gap-1">
+                            <span className="w-6 h-6 flex items-center justify-center bg-[var(--color-gray-100)] text-[var(--color-gray-600)] text-xs font-medium rounded">
+                              {index + 1}
+                            </span>
+                            {/* 순서 변경 버튼 */}
+                            {commonDetailImages.length > 1 && (
+                              <div className="flex flex-col gap-0.5">
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); moveDetailImage(index, index - 1); }}
+                                  disabled={index === 0}
+                                  className={`p-0.5 rounded transition-colors ${
+                                    index === 0
+                                      ? 'text-[var(--color-gray-300)] cursor-not-allowed'
+                                      : 'text-[var(--color-gray-500)] hover:text-[var(--color-gray-700)] hover:bg-[var(--color-gray-100)]'
+                                  }`}
+                                >
+                                  <ChevronUp size={14} />
+                                </button>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); moveDetailImage(index, index + 1); }}
+                                  disabled={index === commonDetailImages.length - 1}
+                                  className={`p-0.5 rounded transition-colors ${
+                                    index === commonDetailImages.length - 1
+                                      ? 'text-[var(--color-gray-300)] cursor-not-allowed'
+                                      : 'text-[var(--color-gray-500)] hover:text-[var(--color-gray-700)] hover:bg-[var(--color-gray-100)]'
+                                  }`}
+                                >
+                                  <ChevronDown size={14} />
+                                </button>
+                              </div>
+                            )}
+                          </div>
                           <img src={img.url} alt={`상세 이미지 ${index + 1}`} className="w-32 h-20 object-cover rounded" />
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-1">
@@ -1287,6 +1690,88 @@ export default function NewShopProductPage() {
           )}
         </div>
       </div>
+
+      {/* 임시저장 불러오기 모달 */}
+      {showDraftModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl w-full max-w-md shadow-xl">
+            {/* 모달 헤더 */}
+            <div className="p-6 border-b border-[var(--color-gray-200)]">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-[var(--color-primary-100)] rounded-lg">
+                  <RotateCcw size={20} className="text-[var(--color-primary-600)]" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-[var(--color-gray-900)]">
+                    임시저장된 내용이 있습니다
+                  </h3>
+                  <p className="text-sm text-[var(--color-gray-500)] mt-0.5">
+                    이전에 작성하던 내용을 불러올까요?
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* 임시저장 정보 */}
+            <div className="p-6">
+              {(() => {
+                const draft = loadDraft();
+                if (!draft) return null;
+                return (
+                  <div className="space-y-3">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-[var(--color-gray-500)]">상품명</span>
+                      <span className="font-medium text-[var(--color-gray-900)]">
+                        {draft.productName || '(미입력)'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-[var(--color-gray-500)]">옵션 수</span>
+                      <span className="font-medium text-[var(--color-gray-900)]">
+                        {draft.options.length}개
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-[var(--color-gray-500)]">저장 시간</span>
+                      <span className="font-medium text-[var(--color-gray-900)]">
+                        {formatSavedTime(draft.savedAt)}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <p className="text-sm text-amber-800">
+                  <strong>참고:</strong> 이미지는 임시저장되지 않습니다. 새로 업로드해주세요.
+                </p>
+              </div>
+            </div>
+
+            {/* 모달 푸터 */}
+            <div className="p-4 bg-[var(--color-gray-50)] rounded-b-xl flex gap-3">
+              <button
+                onClick={() => {
+                  clearDraft();
+                  setShowDraftModal(false);
+                }}
+                className="flex-1 px-4 py-2.5 border border-[var(--color-gray-300)] text-[var(--color-gray-700)] rounded-lg hover:bg-white transition-colors"
+              >
+                새로 작성
+              </button>
+              <button
+                onClick={() => {
+                  const draft = loadDraft();
+                  if (draft) applyDraft(draft);
+                }}
+                className="flex-1 px-4 py-2.5 bg-[var(--color-primary-500)] text-white rounded-lg hover:bg-[var(--color-primary-600)] transition-colors"
+              >
+                불러오기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

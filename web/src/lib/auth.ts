@@ -49,11 +49,36 @@ export const authOptions: AuthOptions = {
           // 카카오 ID를 사용해 고유 이메일 생성 (카카오는 이메일이 선택이므로)
           const uniqueEmail = user.email || `kakao_${account.providerAccountId}@kakao.local`;
           console.log('[AUTH] uniqueEmail:', uniqueEmail);
+          console.log('[AUTH] user.name:', user.name);
 
-          const existingUser = await prisma.user.findUnique({
+          let existingUser = await prisma.user.findUnique({
             where: { email: uniqueEmail },
           });
-          console.log('[AUTH] existingUser:', existingUser);
+          console.log('[AUTH] existingUser by email:', existingUser);
+
+          // 이메일로 못 찾았으면, 같은 이름의 ADMIN 사용자가 있는지 확인
+          // (카카오 이메일이 다를 수 있으므로 이름으로 매칭 시도)
+          if (!existingUser && user.name) {
+            const adminByName = await prisma.user.findFirst({
+              where: {
+                name: user.name,
+                role: 'ADMIN',
+              },
+            });
+            console.log('[AUTH] adminByName:', adminByName);
+
+            if (adminByName) {
+              // 기존 ADMIN 사용자의 이메일을 카카오 이메일로 업데이트
+              existingUser = await prisma.user.update({
+                where: { id: adminByName.id },
+                data: {
+                  email: uniqueEmail,
+                  image: user.image || adminByName.image,
+                },
+              });
+              console.log('[AUTH] Updated existing ADMIN email:', existingUser);
+            }
+          }
 
           if (!existingUser) {
             // 첫 번째 사용자인지 확인
@@ -70,16 +95,14 @@ export const authOptions: AuthOptions = {
               },
             });
             console.log('[AUTH] newUser created:', newUser);
+            existingUser = newUser;
           }
 
           // 관리자 시스템 접근 권한 확인
-          const dbUser = await prisma.user.findUnique({
-            where: { email: uniqueEmail },
-          });
-          console.log('[AUTH] dbUser:', dbUser);
+          console.log('[AUTH] final user:', existingUser);
 
           // CUSTOMER는 관리자 시스템 접근 불가
-          if (dbUser?.role === 'CUSTOMER') {
+          if (existingUser?.role === 'CUSTOMER') {
             console.log('[AUTH] Access denied - CUSTOMER role');
             return '/auth/error?error=AccessDenied';
           }
