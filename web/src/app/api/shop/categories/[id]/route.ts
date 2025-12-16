@@ -64,6 +64,8 @@ export async function PATCH(
       isActive,
       isVisible,
       icon,
+      coupangCategoryCode,
+      naverCategoryId,
     } = body;
 
     // 카테고리 존재 확인
@@ -136,6 +138,8 @@ export async function PATCH(
         ...(isActive !== undefined && { isActive }),
         ...(isVisible !== undefined && { isVisible }),
         ...(icon !== undefined && { icon }),
+        ...(coupangCategoryCode !== undefined && { coupangCategoryCode }),
+        ...(naverCategoryId !== undefined && { naverCategoryId }),
       },
     });
 

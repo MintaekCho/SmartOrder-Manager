@@ -26,29 +26,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const wingClient = getCoupangWingClient();
+    const wingClient = await getCoupangWingClient();
 
     // Wing API 설정 여부 확인
     if (!wingClient.isConfigured()) {
-      // Mock 등록 (테스트용)
-      console.log('[ProductRegister] Mock 등록 모드');
-
-      // 등록 시뮬레이션 딜레이
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      return NextResponse.json({
-        success: true,
-        productId: `MOCK-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
-        message: '[테스트 모드] 상품이 성공적으로 등록되었습니다. 실제 등록을 위해서는 Wing API 인증 정보가 필요합니다.',
-        registeredProduct: {
-          name: product.name,
-          sellingPrice,
-          wholesalePrice: product.price,
-          profit: sellingPrice - product.price - product.shippingFee - (sellingPrice * 0.1),
-          origin: product.origin,
-          category: product.category,
-        },
-      });
+      return NextResponse.json(
+        { success: false, error: '쿠팡 API 설정이 필요합니다. 설정 페이지에서 API 키를 입력해주세요.' },
+        { status: 400 }
+      );
     }
 
     // 실제 Wing API 등록
@@ -71,11 +56,11 @@ export async function POST(request: NextRequest) {
       productGroup: 'NONE',
       deliveryMethod: 'DIRECT' as const,
       deliveryCompanyCode: 'CJGLS',
-      deliveryChargeType: 'PAID' as const,
+      deliveryChargeType: 'NOT_FREE' as const,
       deliveryCharge: product.shippingFee,
       returnCenterCode: '', // 실제 등록 시 필요
       returnCharge: 5000,
-      vendorId: process.env.COUPANG_VENDOR_ID || '',
+      vendorId: wingClient.getVendorId(),
       manufacture: product.seller || '판매자 정보 참조',
       items: [
         {

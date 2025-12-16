@@ -1,21 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getCoupangClient } from '@/lib/coupang/client';
+import { NextResponse } from 'next/server';
+import { getCoupangClientWithVendorId } from '@/lib/coupang/client';
 
 // 대시보드 통계 API
 // 오늘 주문, 미처리 주문, 오늘 매출, 등록 상품 통계를 반환
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    const { searchParams } = new URL(request.url);
-    const vendorId = searchParams.get('vendorId') || process.env.COUPANG_VENDOR_ID;
-
-    if (!vendorId) {
-      return NextResponse.json(
-        { error: 'vendorId is required. Set COUPANG_VENDOR_ID in .env or pass as parameter.' },
-        { status: 400 }
-      );
-    }
-
-    const client = getCoupangClient();
+    const { client, vendorId } = await getCoupangClientWithVendorId();
     const today = new Date().toISOString().split('T')[0];
     const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 

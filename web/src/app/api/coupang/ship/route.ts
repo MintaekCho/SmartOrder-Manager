@@ -1,19 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCoupangClient, DELIVERY_COMPANY_CODES } from '@/lib/coupang/client';
+import { getCoupangClientWithVendorId, DELIVERY_COMPANY_CODES } from '@/lib/coupang/client';
 
 // 송장 등록 (발송 처리)
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { shipmentBoxId, deliveryCompanyCode, invoiceNumber, vendorItemIds } = body;
-    const vendorId = body.vendorId || process.env.COUPANG_VENDOR_ID;
-
-    if (!vendorId) {
-      return NextResponse.json(
-        { error: 'vendorId is required. Set COUPANG_VENDOR_ID in .env or pass in request body.' },
-        { status: 400 }
-      );
-    }
 
     if (!shipmentBoxId) {
       return NextResponse.json({ error: 'shipmentBoxId is required' }, { status: 400 });
@@ -27,7 +19,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'invoiceNumber is required' }, { status: 400 });
     }
 
-    const client = getCoupangClient();
+    const { client, vendorId } = await getCoupangClientWithVendorId();
     const response = await client.shipOrder(vendorId, {
       shipmentBoxId: Number(shipmentBoxId),
       deliveryCompanyCode,

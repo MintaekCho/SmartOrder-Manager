@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { DashboardLayout } from '@/components/layout';
 import {
   Plus,
@@ -17,9 +17,11 @@ import {
   Package,
   Leaf,
   Loader2,
-  GripVertical,
   Eye,
   EyeOff,
+  Link2,
+  X,
+  CheckCircle2,
 } from 'lucide-react';
 import { Dropdown } from '@/components/ui/Dropdown';
 
@@ -36,11 +38,20 @@ interface Category {
   isVisible: boolean;
   icon: string | null;
   productSeq: number;
+  coupangCategoryCode: string | null;
+  naverCategoryId: string | null;
   children?: Category[];
 }
 
+interface PlatformCategory {
+  code: number | string;
+  name: string;
+  fullPath?: string;
+  isLeaf?: boolean;
+}
+
 // 아이콘 맵핑
-const iconMap: Record<string, any> = {
+const iconMap: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
   apple: Apple,
   carrot: Carrot,
   wheat: Wheat,
@@ -66,8 +77,17 @@ export default function CategoriesPage() {
     displayOrder: 0,
     isActive: true,
     isVisible: true,
+    coupangCategoryCode: '',
+    naverCategoryId: '',
   });
   const [saving, setSaving] = useState(false);
+
+  // 플랫폼 카테고리 검색 상태
+  const [platformSearchKeyword, setPlatformSearchKeyword] = useState('');
+  const [platformSearchResults, setPlatformSearchResults] = useState<PlatformCategory[]>([]);
+  const [searchingPlatform, setSearchingPlatform] = useState<'COUPANG' | 'NAVER' | null>(null);
+  const [isPlatformMappingOpen, setIsPlatformMappingOpen] = useState(false);
+  const [mappingCategory, setMappingCategory] = useState<Category | null>(null);
 
   useEffect(() => {
     fetchCategories();
@@ -119,6 +139,8 @@ export default function CategoriesPage() {
       displayOrder: 0,
       isActive: true,
       isVisible: true,
+      coupangCategoryCode: '',
+      naverCategoryId: '',
     });
     setIsModalOpen(true);
   };
@@ -135,8 +157,79 @@ export default function CategoriesPage() {
       displayOrder: category.displayOrder,
       isActive: category.isActive,
       isVisible: category.isVisible,
+      coupangCategoryCode: category.coupangCategoryCode || '',
+      naverCategoryId: category.naverCategoryId || '',
     });
     setIsModalOpen(true);
+  };
+
+  // 플랫폼 카테고리 매핑 모달 열기
+  const openPlatformMappingModal = (category: Category) => {
+    setMappingCategory(category);
+    setFormData(prev => ({
+      ...prev,
+      coupangCategoryCode: category.coupangCategoryCode || '',
+      naverCategoryId: category.naverCategoryId || '',
+    }));
+    setPlatformSearchKeyword('');
+    setPlatformSearchResults([]);
+    setIsPlatformMappingOpen(true);
+  };
+
+  // 플랫폼 카테고리 검색
+  const searchPlatformCategories = useCallback(async (platform: 'COUPANG' | 'NAVER', keyword: string) => {
+    if (!keyword.trim()) {
+      setPlatformSearchResults([]);
+      return;
+    }
+
+    setSearchingPlatform(platform);
+    try {
+      const response = await fetch(`/api/platform/categories?platform=${platform}&keyword=${encodeURIComponent(keyword)}`);
+      const result = await response.json();
+
+      if (result.success) {
+        setPlatformSearchResults(result.data);
+      } else {
+        setPlatformSearchResults([]);
+      }
+    } catch (error) {
+      console.error('플랫폼 카테고리 검색 실패:', error);
+      setPlatformSearchResults([]);
+    } finally {
+      setSearchingPlatform(null);
+    }
+  }, []);
+
+  // 플랫폼 카테고리 매핑 저장
+  const savePlatformMapping = async () => {
+    if (!mappingCategory) return;
+
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/shop/categories/${mappingCategory.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          coupangCategoryCode: formData.coupangCategoryCode || null,
+          naverCategoryId: formData.naverCategoryId || null,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setIsPlatformMappingOpen(false);
+        fetchCategories();
+        alert('플랫폼 카테고리가 매핑되었습니다.');
+      } else {
+        alert(data.error);
+      }
+    } catch (error) {
+      console.error('매핑 저장 실패:', error);
+      alert('저장에 실패했습니다.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -155,6 +248,8 @@ export default function CategoriesPage() {
         body: JSON.stringify({
           ...formData,
           parentId: formData.parentId || null,
+          coupangCategoryCode: formData.coupangCategoryCode || null,
+          naverCategoryId: formData.naverCategoryId || null,
         }),
       });
 
@@ -213,7 +308,7 @@ export default function CategoriesPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(cat),
         });
-      } catch (error) {
+      } catch {
         // 이미 존재하는 경우 무시
       }
     }
@@ -224,10 +319,7 @@ export default function CategoriesPage() {
   const generateSlug = (name: string) => {
     return name
       .toLowerCase()
-      .replace(/[가-힣]/g, (char) => {
-        // 간단한 한글->영어 변환
-        return char;
-      })
+      .replace(/[가-힣]/g, (char) => char)
       .replace(/\s+/g, '-')
       .replace(/[^a-z0-9가-힣-]/g, '');
   };
@@ -236,6 +328,7 @@ export default function CategoriesPage() {
     const hasChildren = category.children && category.children.length > 0;
     const isExpanded = expandedCategories.has(category.id);
     const IconComponent = category.icon ? iconMap[category.icon] : FolderTree;
+    const hasPlatformMapping = category.coupangCategoryCode || category.naverCategoryId;
 
     return (
       <div key={category.id}>
@@ -271,9 +364,24 @@ export default function CategoriesPage() {
                 <span className="px-1.5 py-0.5 text-xs bg-blue-100 text-blue-700 rounded font-mono">{category.code}</span>
               )}
             </div>
-            {category.description && (
-              <p className="text-xs text-[var(--color-gray-500)] mt-0.5">{category.description}</p>
-            )}
+            {/* 플랫폼 매핑 상태 */}
+            <div className="flex items-center gap-1 mt-1">
+              {category.coupangCategoryCode ? (
+                <span className="px-1.5 py-0.5 text-xs bg-orange-100 text-orange-700 rounded flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+                  쿠팡
+                </span>
+              ) : null}
+              {category.naverCategoryId ? (
+                <span className="px-1.5 py-0.5 text-xs bg-green-100 text-green-700 rounded flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                  네이버
+                </span>
+              ) : null}
+              {!hasPlatformMapping && (
+                <span className="text-xs text-[var(--color-gray-400)]">플랫폼 미연결</span>
+              )}
+            </div>
           </div>
 
           {/* 상태 */}
@@ -292,6 +400,13 @@ export default function CategoriesPage() {
 
           {/* 액션 */}
           <div className="flex items-center gap-1">
+            <button
+              onClick={() => openPlatformMappingModal(category)}
+              className="p-1.5 hover:bg-blue-100 rounded"
+              title="플랫폼 카테고리 연결"
+            >
+              <Link2 size={16} className="text-blue-500" />
+            </button>
             <button
               onClick={() => openCreateModal(category.id)}
               className="p-1.5 hover:bg-[var(--color-gray-100)] rounded"
@@ -364,7 +479,7 @@ export default function CategoriesPage() {
       <div className="flex justify-between items-center mb-6">
         <div>
           <p className="text-sm text-[var(--color-gray-600)]">
-            자사몰 상품 카테고리를 관리합니다
+            자사몰 상품 카테고리를 관리합니다. 플랫폼 카테고리와 연결하면 상품 등록 시 자동 매핑됩니다.
           </p>
         </div>
         <div className="flex gap-2">
@@ -405,7 +520,7 @@ export default function CategoriesPage() {
           <div className="w-8" />
           <div className="flex-1 text-xs font-medium text-[var(--color-gray-600)] uppercase">카테고리명</div>
           <div className="w-24 text-xs font-medium text-[var(--color-gray-600)] uppercase text-center">상태</div>
-          <div className="w-28 text-xs font-medium text-[var(--color-gray-600)] uppercase text-center">액션</div>
+          <div className="w-36 text-xs font-medium text-[var(--color-gray-600)] uppercase text-center">액션</div>
         </div>
 
         {/* 목록 */}
@@ -425,10 +540,10 @@ export default function CategoriesPage() {
         )}
       </div>
 
-      {/* 모달 */}
+      {/* 카테고리 추가/수정 모달 */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl w-full max-w-md mx-4 shadow-xl">
+          <div className="bg-white rounded-xl w-full max-w-md mx-4 shadow-xl max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-[var(--color-gray-200)]">
               <h2 className="text-lg font-bold text-[var(--color-gray-900)]">
                 {editingCategory ? '카테고리 수정' : '카테고리 추가'}
@@ -473,7 +588,7 @@ export default function CategoriesPage() {
               {/* 카테고리 코드 */}
               <div>
                 <label className="block text-sm font-medium text-[var(--color-gray-700)] mb-1">
-                  카테고리 코드 * <span className="text-xs text-[var(--color-gray-500)] font-normal">(상품코드 생성용)</span>
+                  카테고리 코드 *
                 </label>
                 <input
                   type="text"
@@ -484,9 +599,6 @@ export default function CategoriesPage() {
                   required
                   maxLength={10}
                 />
-                <p className="text-xs text-[var(--color-gray-500)] mt-1">
-                  영문 대문자와 숫자만 가능 (예: FRUIT-001 형태의 상품코드가 생성됨)
-                </p>
               </div>
 
               {/* 상위 카테고리 */}
@@ -587,6 +699,203 @@ export default function CategoriesPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* 플랫폼 카테고리 매핑 모달 */}
+      {isPlatformMappingOpen && mappingCategory && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl w-full max-w-lg mx-4 shadow-xl max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-[var(--color-gray-200)] flex justify-between items-center">
+              <div>
+                <h2 className="text-lg font-bold text-[var(--color-gray-900)]">
+                  플랫폼 카테고리 연결
+                </h2>
+                <p className="text-sm text-[var(--color-gray-500)] mt-1">
+                  &quot;{mappingCategory.name}&quot; 카테고리
+                </p>
+              </div>
+              <button
+                onClick={() => setIsPlatformMappingOpen(false)}
+                className="p-2 hover:bg-[var(--color-gray-100)] rounded-lg"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* 쿠팡 카테고리 */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-6 h-6 bg-orange-500 rounded flex items-center justify-center">
+                    <span className="text-white text-xs font-bold">C</span>
+                  </div>
+                  <span className="font-medium">쿠팡 카테고리</span>
+                  {formData.coupangCategoryCode && (
+                    <CheckCircle2 size={16} className="text-green-500" />
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={formData.coupangCategoryCode}
+                      onChange={(e) => setFormData({ ...formData, coupangCategoryCode: e.target.value })}
+                      placeholder="카테고리 코드 (예: 78877)"
+                      className="flex-1 px-3 py-2 border border-[var(--color-gray-300)] rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    />
+                    {formData.coupangCategoryCode && (
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, coupangCategoryCode: '' })}
+                        className="px-3 py-2 text-red-500 hover:bg-red-50 rounded-lg"
+                      >
+                        해제
+                      </button>
+                    )}
+                  </div>
+
+                  {/* 검색 */}
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={platformSearchKeyword}
+                      onChange={(e) => setPlatformSearchKeyword(e.target.value)}
+                      placeholder="카테고리 검색..."
+                      className="flex-1 px-3 py-2 border border-[var(--color-gray-300)] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => searchPlatformCategories('COUPANG', platformSearchKeyword)}
+                      disabled={searchingPlatform === 'COUPANG'}
+                      className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50 text-sm"
+                    >
+                      {searchingPlatform === 'COUPANG' ? <Loader2 size={16} className="animate-spin" /> : '검색'}
+                    </button>
+                  </div>
+
+                  {/* 검색 결과 */}
+                  {platformSearchResults.length > 0 && searchingPlatform !== 'NAVER' && (
+                    <div className="max-h-40 overflow-y-auto border border-[var(--color-gray-200)] rounded-lg">
+                      {platformSearchResults.map((cat) => (
+                        <button
+                          key={cat.code}
+                          type="button"
+                          onClick={() => {
+                            setFormData({ ...formData, coupangCategoryCode: String(cat.code) });
+                            setPlatformSearchResults([]);
+                          }}
+                          className="w-full px-3 py-2 text-left hover:bg-orange-50 border-b border-[var(--color-gray-100)] last:border-0"
+                        >
+                          <div className="text-sm font-medium">{cat.name}</div>
+                          {cat.fullPath && (
+                            <div className="text-xs text-[var(--color-gray-500)]">{cat.fullPath}</div>
+                          )}
+                          <div className="text-xs text-orange-600">코드: {cat.code}</div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 네이버 카테고리 */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-6 h-6 bg-green-500 rounded flex items-center justify-center">
+                    <span className="text-white text-xs font-bold">N</span>
+                  </div>
+                  <span className="font-medium">네이버 카테고리</span>
+                  {formData.naverCategoryId && (
+                    <CheckCircle2 size={16} className="text-green-500" />
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={formData.naverCategoryId}
+                      onChange={(e) => setFormData({ ...formData, naverCategoryId: e.target.value })}
+                      placeholder="카테고리 ID (예: 50003118)"
+                      className="flex-1 px-3 py-2 border border-[var(--color-gray-300)] rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                    {formData.naverCategoryId && (
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, naverCategoryId: '' })}
+                        className="px-3 py-2 text-red-500 hover:bg-red-50 rounded-lg"
+                      >
+                        해제
+                      </button>
+                    )}
+                  </div>
+
+                  {/* 검색 */}
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={platformSearchKeyword}
+                      onChange={(e) => setPlatformSearchKeyword(e.target.value)}
+                      placeholder="카테고리 검색..."
+                      className="flex-1 px-3 py-2 border border-[var(--color-gray-300)] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => searchPlatformCategories('NAVER', platformSearchKeyword)}
+                      disabled={searchingPlatform === 'NAVER'}
+                      className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 text-sm"
+                    >
+                      {searchingPlatform === 'NAVER' ? <Loader2 size={16} className="animate-spin" /> : '검색'}
+                    </button>
+                  </div>
+
+                  {/* 검색 결과 */}
+                  {platformSearchResults.length > 0 && searchingPlatform !== 'COUPANG' && (
+                    <div className="max-h-40 overflow-y-auto border border-[var(--color-gray-200)] rounded-lg">
+                      {platformSearchResults.map((cat) => (
+                        <button
+                          key={cat.code}
+                          type="button"
+                          onClick={() => {
+                            setFormData({ ...formData, naverCategoryId: String(cat.code) });
+                            setPlatformSearchResults([]);
+                          }}
+                          className="w-full px-3 py-2 text-left hover:bg-green-50 border-b border-[var(--color-gray-100)] last:border-0"
+                        >
+                          <div className="text-sm font-medium">{cat.name}</div>
+                          {cat.fullPath && (
+                            <div className="text-xs text-[var(--color-gray-500)]">{cat.fullPath}</div>
+                          )}
+                          <div className="text-xs text-green-600">ID: {cat.code}</div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 버튼 */}
+              <div className="flex gap-2 pt-4 border-t border-[var(--color-gray-200)]">
+                <button
+                  type="button"
+                  onClick={() => setIsPlatformMappingOpen(false)}
+                  className="flex-1 py-2 border border-[var(--color-gray-300)] text-[var(--color-gray-700)] rounded-lg hover:bg-[var(--color-gray-50)]"
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  onClick={savePlatformMapping}
+                  disabled={saving}
+                  className="flex-1 py-2 bg-[var(--color-primary-500)] text-white rounded-lg hover:bg-[var(--color-primary-600)] disabled:opacity-50"
+                >
+                  {saving ? '저장 중...' : '저장'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

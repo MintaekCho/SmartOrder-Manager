@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import SessionProvider from "@/components/providers/SessionProvider";
-import { SystemModeProvider } from "@/contexts/SystemModeContext";
+import { FeatureSettingsProvider } from "@/contexts/FeatureSettingsContext";
 import PageLoadingProvider from "@/components/providers/PageLoadingProvider";
 
 const geistSans = Geist({
@@ -32,9 +32,9 @@ export default function RootLayout({
       >
         <PageLoadingProvider />
         <SessionProvider>
-          <SystemModeProvider>
+          <FeatureSettingsProvider>
             {children}
-          </SystemModeProvider>
+          </FeatureSettingsProvider>
         </SessionProvider>
       </body>
     </html>

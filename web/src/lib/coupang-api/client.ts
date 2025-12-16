@@ -27,13 +27,16 @@ export class CoupangApiClient {
   /**
    * HMAC 서명 생성
    * 쿠팡 API는 HMAC-SHA256 서명 인증을 사용
+   * 메시지 형식: datetime + method + path + query (query는 ? 없이)
    */
   private generateSignature(
     method: string,
     path: string,
+    query: string,
     datetime: string
   ): string {
-    const message = `${datetime}${method}${path}`;
+    // 메시지 구성: datetime + method + path + query (query는 ? 없이)
+    const message = `${datetime}${method}${path}${query}`;
     const signature = crypto
       .createHmac('sha256', this.secretKey)
       .update(message)
@@ -43,21 +46,46 @@ export class CoupangApiClient {
   }
 
   /**
+   * 쿠팡 API 날짜 형식 생성 (yyMMddTHHmmssZ - GMT+0)
+   */
+  private getFormattedDatetime(): string {
+    const now = new Date();
+    const year = String(now.getUTCFullYear()).slice(-2); // 2자리 연도
+    const month = String(now.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(now.getUTCDate()).padStart(2, '0');
+    const hours = String(now.getUTCHours()).padStart(2, '0');
+    const minutes = String(now.getUTCMinutes()).padStart(2, '0');
+    const seconds = String(now.getUTCSeconds()).padStart(2, '0');
+    return `${year}${month}${day}T${hours}${minutes}${seconds}Z`;
+  }
+
+  /**
    * API 요청
    */
   private async request<T>(
     method: string,
-    path: string,
+    fullPath: string,
     body?: unknown
   ): Promise<T> {
-    const datetime = new Date()
-      .toISOString()
-      .replace(/[-:]/g, '')
-      .replace(/\.\d{3}/, '');
+    const datetime = this.getFormattedDatetime();
 
-    const authorization = this.generateSignature(method, path, datetime);
+    // path와 query 분리 (쿼리스트링이 있는 경우)
+    const [path, queryString] = fullPath.includes('?')
+      ? fullPath.split('?')
+      : [fullPath, ''];
 
-    const response = await fetch(`${this.baseUrl}${path}`, {
+    // 서명 생성 (path와 query를 분리하여 전달)
+    const authorization = this.generateSignature(method, path, queryString, datetime);
+
+    // 디버그 로그
+    console.log(`[CoupangApiClient] ${method} Request:`, {
+      url: `${this.baseUrl}${fullPath}`,
+      datetime,
+      path,
+      query: queryString,
+    });
+
+    const response = await fetch(`${this.baseUrl}${fullPath}`, {
       method,
       headers: {
         'Content-Type': 'application/json;charset=UTF-8',
@@ -69,6 +97,14 @@ export class CoupangApiClient {
 
     if (!response.ok) {
       const errorText = await response.text();
+      console.error('[CoupangApiClient] Error Response:', {
+        status: response.status,
+        statusText: response.statusText,
+        body: errorText,
+        method,
+        path,
+        query: queryString,
+      });
       throw new Error(`Coupang API Error: ${response.status} - ${errorText}`);
     }
 

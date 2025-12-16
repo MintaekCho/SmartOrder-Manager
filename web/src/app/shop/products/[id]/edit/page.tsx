@@ -17,6 +17,9 @@ import {
   Eye,
   Smartphone,
   Monitor,
+  GripVertical,
+  ChevronUp,
+  ChevronDown,
 } from 'lucide-react';
 import { Dropdown } from '@/components/ui/Dropdown';
 
@@ -147,6 +150,10 @@ export default function EditShopProductPage({ params }: { params: Promise<{ id: 
   const [showPreview, setShowPreview] = useState(false);
   const [previewDevice, setPreviewDevice] = useState<'mobile' | 'desktop'>('mobile');
 
+  // 드래그앤드롭 상태
+  const [draggedDetailIndex, setDraggedDetailIndex] = useState<number | null>(null);
+  const [dragOverDetailIndex, setDragOverDetailIndex] = useState<number | null>(null);
+
   // 상품 데이터 로드
   useEffect(() => {
     const fetchProduct = async () => {
@@ -252,6 +259,37 @@ export default function EditShopProductPage({ params }: { params: Promise<{ id: 
   // 상세페이지 이미지 삭제
   const removeDetailImage = (index: number) => {
     setDetailImages(detailImages.filter((_, i) => i !== index));
+  };
+
+  // 상세페이지 이미지 순서 변경
+  const moveDetailImage = (fromIndex: number, toIndex: number) => {
+    if (toIndex < 0 || toIndex >= detailImages.length) return;
+    const newImages = [...detailImages];
+    const [removed] = newImages.splice(fromIndex, 1);
+    newImages.splice(toIndex, 0, removed);
+    setDetailImages(newImages);
+  };
+
+  // 드래그 시작
+  const handleDetailDragStart = (index: number) => {
+    setDraggedDetailIndex(index);
+  };
+
+  // 드래그 오버
+  const handleDetailDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedDetailIndex !== null && draggedDetailIndex !== index) {
+      setDragOverDetailIndex(index);
+    }
+  };
+
+  // 드래그 종료
+  const handleDetailDragEnd = () => {
+    if (draggedDetailIndex !== null && dragOverDetailIndex !== null) {
+      moveDetailImage(draggedDetailIndex, dragOverDetailIndex);
+    }
+    setDraggedDetailIndex(null);
+    setDragOverDetailIndex(null);
   };
 
   // 가격 포맷
@@ -630,9 +668,14 @@ export default function EditShopProductPage({ params }: { params: Promise<{ id: 
           {/* 상세페이지 이미지 */}
           <div className="mb-6">
             <div className="flex items-center justify-between mb-3">
-              <label className="block text-sm font-medium text-[var(--color-gray-700)]">
-                상세페이지 이미지
-              </label>
+              <div>
+                <label className="block text-sm font-medium text-[var(--color-gray-700)]">
+                  상세페이지 이미지
+                </label>
+                <p className="text-xs text-[var(--color-gray-400)] mt-0.5">
+                  드래그하거나 ▲▼ 버튼으로 순서를 변경할 수 있습니다
+                </p>
+              </div>
               <div className="text-xs text-[var(--color-gray-500)]">
                 권장: 가로 860px 이상 | 최소: 가로 500px | 최대: 10MB
               </div>
@@ -640,9 +683,49 @@ export default function EditShopProductPage({ params }: { params: Promise<{ id: 
 
             <div className="space-y-3 mb-4">
               {detailImages.map((img, index) => (
-                <div key={index} className={`flex items-start gap-4 p-3 rounded-lg border ${
-                  img.validation?.valid !== false ? 'border-[var(--color-gray-200)]' : 'border-red-300 bg-red-50'
-                }`}>
+                <div
+                  key={index}
+                  draggable
+                  onDragStart={() => handleDetailDragStart(index)}
+                  onDragOver={(e) => handleDetailDragOver(e, index)}
+                  onDragEnd={handleDetailDragEnd}
+                  className={`flex items-start gap-4 p-3 rounded-lg border transition-all ${
+                    img.validation?.valid !== false ? 'border-[var(--color-gray-200)]' : 'border-red-300 bg-red-50'
+                  } ${draggedDetailIndex === index ? 'opacity-50 scale-[0.98]' : ''} ${
+                    dragOverDetailIndex === index ? 'border-[var(--color-primary-500)] bg-[var(--color-primary-50)]' : ''
+                  }`}
+                >
+                  {/* 드래그 핸들 */}
+                  <div className="flex items-center cursor-grab active:cursor-grabbing">
+                    <GripVertical size={20} className="text-[var(--color-gray-400)]" />
+                  </div>
+
+                  {/* 순서 번호 */}
+                  <div className="flex flex-col items-center gap-1">
+                    <span className="w-6 h-6 flex items-center justify-center bg-[var(--color-gray-100)] text-[var(--color-gray-600)] text-xs font-medium rounded">
+                      {index + 1}
+                    </span>
+                    {/* 순서 변경 버튼 */}
+                    <div className="flex flex-col">
+                      <button
+                        onClick={() => moveDetailImage(index, index - 1)}
+                        disabled={index === 0}
+                        className="p-0.5 hover:bg-[var(--color-gray-100)] rounded disabled:opacity-30 disabled:cursor-not-allowed"
+                        title="위로 이동"
+                      >
+                        <ChevronUp size={14} className="text-[var(--color-gray-500)]" />
+                      </button>
+                      <button
+                        onClick={() => moveDetailImage(index, index + 1)}
+                        disabled={index === detailImages.length - 1}
+                        className="p-0.5 hover:bg-[var(--color-gray-100)] rounded disabled:opacity-30 disabled:cursor-not-allowed"
+                        title="아래로 이동"
+                      >
+                        <ChevronDown size={14} className="text-[var(--color-gray-500)]" />
+                      </button>
+                    </div>
+                  </div>
+
                   <img src={img.url} alt={`상세 이미지 ${index + 1}`} className="w-32 h-20 object-cover rounded" />
                   <div className="flex-1">
                     {img.validation && (

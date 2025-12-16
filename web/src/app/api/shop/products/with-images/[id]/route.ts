@@ -6,13 +6,17 @@ import { supabaseAdmin, STORAGE_BUCKETS, getPublicUrl } from '@/lib/supabase';
 import { v4 as uuidv4 } from 'uuid';
 
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_THUMBNAIL_SIZE = 5 * 1024 * 1024; // 썸네일/일반 이미지: 5MB
+const MAX_DETAIL_IMAGE_SIZE = 10 * 1024 * 1024; // 상세페이지 이미지: 10MB
 const MAX_IMAGES = 10;
 
 // 이미지 업로드 헬퍼 함수
 async function uploadImage(file: File, bucket: string): Promise<string | null> {
   if (!ALLOWED_MIME_TYPES.includes(file.type)) return null;
-  if (file.size > MAX_FILE_SIZE) return null;
+
+  // 버킷에 따라 파일 크기 제한 다르게 적용
+  const maxSize = bucket === STORAGE_BUCKETS.PRODUCT_DETAILS ? MAX_DETAIL_IMAGE_SIZE : MAX_THUMBNAIL_SIZE;
+  if (file.size > maxSize) return null;
 
   const ext = file.name.split('.').pop() || 'jpg';
   const fileName = `${uuidv4()}.${ext}`;
@@ -137,7 +141,7 @@ export async function PATCH(
       updateData.shopImages = finalImages;
     }
 
-    // 상세 이미지 업로드 (필요한 경우)
+    // 상세 이미지 업로드 및 HTML 변환
     if (detailImageFiles.length > 0) {
       const detailImageUrls: string[] = [];
       for (const file of detailImageFiles) {
@@ -146,7 +150,17 @@ export async function PATCH(
           if (url) detailImageUrls.push(url);
         }
       }
-      // 상세 이미지는 별도 필드가 필요하면 추가
+
+      // 상세 이미지 URL들을 HTML img 태그로 변환하여 shopDescription에 포함
+      if (detailImageUrls.length > 0) {
+        const detailImagesHtml = detailImageUrls
+          .map(url => `<img src="${url}" style="width:100%;display:block;margin:0 auto;" alt="상세이미지" loading="lazy" />`)
+          .join('\n');
+        // 기존 shopDescription 가져오기 (이번 요청에서 전달된 값 또는 DB 기존값)
+        const currentShopDescription = updateData.shopDescription ?? existing.shopDescription ?? '';
+        // 이미지가 먼저 오고, 그 다음에 기존 설명이 오도록 구성
+        updateData.shopDescription = detailImagesHtml + (currentShopDescription ? '\n' + currentShopDescription : '');
+      }
     }
 
     // 업데이트할 데이터가 없으면 에러
