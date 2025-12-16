@@ -1,25 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCoupangClient } from '@/lib/coupang/client';
+import { getCoupangClientWithVendorId } from '@/lib/coupang/client';
 
 // 주문 목록 조회
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const vendorId = searchParams.get('vendorId') || process.env.COUPANG_VENDOR_ID;
     const status = searchParams.get('status') || 'ACCEPT';
     const createdAtFrom = searchParams.get('createdAtFrom');
     const createdAtTo = searchParams.get('createdAtTo');
     const nextToken = searchParams.get('nextToken');
     const maxPerPage = searchParams.get('maxPerPage');
 
-    if (!vendorId) {
-      return NextResponse.json(
-        { error: 'vendorId is required. Set COUPANG_VENDOR_ID in .env or pass as parameter.' },
-        { status: 400 }
-      );
-    }
-
-    const client = getCoupangClient();
+    const { client, vendorId } = await getCoupangClientWithVendorId();
     const response = await client.getOrders({
       vendorId,
       status,

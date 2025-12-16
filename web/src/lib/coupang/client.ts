@@ -71,9 +71,9 @@ export class CoupangClient {
   private accessKey: string;
   private secretKey: string;
 
-  constructor(config?: CoupangConfig) {
-    this.accessKey = config?.accessKey || process.env.COUPANG_ACCESS_KEY || '';
-    this.secretKey = config?.secretKey || process.env.COUPANG_SECRET_KEY || '';
+  constructor(config: CoupangConfig) {
+    this.accessKey = config.accessKey;
+    this.secretKey = config.secretKey;
 
     if (!this.accessKey || !this.secretKey) {
       console.warn('Coupang API credentials not configured');
@@ -358,11 +358,11 @@ export class CoupangClient {
   }
 
   // 반품지 목록 조회
-  // GET /v2/providers/seller_api/apis/api/v1/vendors/{vendorId}/return-shipping-centers
+  // GET /v2/providers/openapi/apis/api/v4/vendors/{vendorId}/returnShippingCenters
   async getReturnShippingCenters(vendorId: string, pageNum: number = 1, pageSize: number = 50) {
     return this.request<CoupangReturnShippingCentersResponse>({
       method: 'GET',
-      path: `/v2/providers/seller_api/apis/api/v1/vendors/${vendorId}/return-shipping-centers`,
+      path: `/v2/providers/openapi/apis/api/v4/vendors/${vendorId}/returnShippingCenters`,
       query: {
         pageNum,
         pageSize,
@@ -824,12 +824,16 @@ export interface CoupangOutboundShippingPlacesResponse extends CoupangBaseRespon
 
 // 반품지 목록 응답
 export interface ReturnShippingCenter {
+  vendorId?: string;                  // 업체 코드
   returnCenterCode: string;           // 반품지 코드
   shippingPlaceName: string;          // 반품지 이름
   deliverCode?: string;               // 택배사 코드
   deliverName?: string;               // 택배사 이름
+  goodsflowStatus?: string;           // 굿스플로 상태
+  errorMessage?: string;              // 에러 메시지
+  createdAt?: number;                 // 생성일 (timestamp)
   placeAddresses?: {
-    addressType: string;              // ROADNAME, JIBUN
+    addressType: string;              // JIBUN, ROADNAME
     countryCode: string;
     companyContactNumber?: string;    // 업체 연락처
     phoneNumber2?: string;
@@ -841,14 +845,23 @@ export interface ReturnShippingCenter {
 }
 
 export interface CoupangReturnShippingCentersResponse extends CoupangBaseResponse {
-  data: {
+  // 새 API 응답 구조
+  data?: {
     content: ReturnShippingCenter[];
     pagination: {
-      pageNum: number;
-      pageSize: number;
-      totalElements: number;
+      currentPage: number;
       totalPages: number;
+      totalElements: number;
+      countPerPage: number;
     };
+  };
+  // 직접 content가 오는 경우 (호환성)
+  content?: ReturnShippingCenter[];
+  pagination?: {
+    currentPage: number;
+    totalPages: number;
+    totalElements: number;
+    countPerPage: number;
   };
 }
 
@@ -889,12 +902,103 @@ export const UNION_DELIVERY_TYPES = {
   NOT_UNION_DELIVERY: '묶음배송 불가',
 } as const;
 
-// 싱글톤 인스턴스
-let clientInstance: CoupangClient | null = null;
+// 싱글톤 인스턴스 캐시 (userId별)
+const clientCache = new Map<string, CoupangClient>();
 
-export function getCoupangClient(): CoupangClient {
-  if (!clientInstance) {
-    clientInstance = new CoupangClient();
+// DB에서 기본 사용자 설정을 로드하여 클라이언트 반환 (레거시 호환)
+export async function getCoupangClient(): Promise<CoupangClient> {
+  const { getOrCreateDefaultUserId } = await import('@/lib/auth');
+  const userId = await getOrCreateDefaultUserId();
+
+  // 캐시 확인
+  const cached = clientCache.get(userId);
+  if (cached) {
+    return cached;
   }
-  return clientInstance;
+
+  // DB에서 설정 로드
+  const client = await getCoupangClientFromDB(userId);
+  if (!client) {
+    throw new Error('쿠팡 API 설정이 없습니다. 설정 페이지에서 API 키를 입력해주세요.');
+  }
+
+  clientCache.set(userId, client);
+  return client;
+}
+
+// DB에서 사용자별 설정을 로드하여 클라이언트 생성
+export async function getCoupangClientFromDB(userId: string): Promise<CoupangClient | null> {
+  try {
+    // 동적 import로 순환 참조 방지
+    const { prisma } = await import('@/lib/prisma');
+
+    const config = await prisma.platformConfig.findUnique({
+      where: {
+        userId_platform: {
+          userId,
+          platform: 'COUPANG',
+        },
+      },
+    });
+
+    if (!config || !config.isActive) {
+      console.warn(`[CoupangClient] No active config for user ${userId}`);
+      return null;
+    }
+
+    const credentials = config.credentials as Record<string, string>;
+    const { accessKey, secretKey } = credentials;
+
+    if (!accessKey || !secretKey) {
+      console.warn(`[CoupangClient] Missing credentials for user ${userId}`);
+      return null;
+    }
+
+    return new CoupangClient({ accessKey, secretKey });
+  } catch (error) {
+    console.error('[CoupangClient] Error loading from DB:', error);
+    return null;
+  }
+}
+
+// 자격 증명을 직접 받아서 클라이언트 생성 (환경 변수 fallback 없이)
+export function createCoupangClient(credentials: { accessKey: string; secretKey: string }): CoupangClient {
+  // 명시적으로 credentials를 전달받았으므로 환경 변수 fallback 사용하지 않음
+  // 빈 값이더라도 그대로 사용하여 API 인증 실패를 정확히 감지
+  return new CoupangClient({
+    accessKey: credentials.accessKey,
+    secretKey: credentials.secretKey,
+  });
+}
+
+// DB에서 클라이언트와 vendorId를 함께 반환
+export async function getCoupangClientWithVendorId(): Promise<{ client: CoupangClient; vendorId: string }> {
+  const { getOrCreateDefaultUserId } = await import('@/lib/auth');
+  const { prisma } = await import('@/lib/prisma');
+  const userId = await getOrCreateDefaultUserId();
+
+  const config = await prisma.platformConfig.findUnique({
+    where: {
+      userId_platform: {
+        userId,
+        platform: 'COUPANG',
+      },
+    },
+  });
+
+  if (!config || !config.isActive) {
+    throw new Error('쿠팡 API 설정이 없습니다. 설정 페이지에서 API 키를 입력해주세요.');
+  }
+
+  const credentials = config.credentials as Record<string, string>;
+  const { accessKey, secretKey, vendorId } = credentials;
+
+  if (!accessKey || !secretKey || !vendorId) {
+    throw new Error('쿠팡 API 자격 증명이 완전하지 않습니다. Access Key, Secret Key, Vendor ID를 모두 입력해주세요.');
+  }
+
+  return {
+    client: new CoupangClient({ accessKey, secretKey }),
+    vendorId,
+  };
 }

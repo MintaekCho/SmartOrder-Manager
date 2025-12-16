@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     const parentCode = searchParams.get('parentCode');
     const meta = searchParams.get('meta');
 
-    const client = getCoupangClient();
+    const client = await getCoupangClient();
 
     // 카테고리 메타 정보 조회 (상품고시정보, 필수옵션 등)
     if (meta) {

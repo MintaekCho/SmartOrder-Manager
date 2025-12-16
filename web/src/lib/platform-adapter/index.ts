@@ -81,10 +81,10 @@ export class MultiPlatformUploadService {
   /**
    * 플랫폼 설정 상태 확인
    */
-  checkPlatformConfigurations(): Map<Platform, boolean> {
+  async checkPlatformConfigurations(): Promise<Map<Platform, boolean>> {
     const status = new Map<Platform, boolean>();
 
-    status.set('COUPANG', getCoupangAdapter().isConfigured());
+    status.set('COUPANG', await getCoupangAdapter().isConfigured());
     status.set('NAVER', getNaverAdapter().isConfigured());
     status.set('SHOP', true); // 자사몰은 항상 사용 가능
 

@@ -10,20 +10,46 @@
 import crypto from 'crypto';
 
 export interface CoupangProduct {
+  // 기본 정보
   sellerProductId?: string;
   sellerProductName: string;
   displayCategoryCode: number;
   brand: string;
   generalProductName: string;
   productGroup: string;
+
+  // 판매 기간 (PDF 가이드 9페이지)
+  saleStartedAt?: string;  // yyyy-MM-ddTHH:mm:ss
+  saleEndedAt?: string;    // yyyy-MM-ddTHH:mm:ss
+
+  // 배송 정보 (PDF 가이드 11-12페이지)
   deliveryMethod: 'DIRECT' | 'VENDOR';
   deliveryCompanyCode: string;
-  deliveryChargeType: 'FREE' | 'PAID' | 'CONDITIONAL';
+  deliveryChargeType: 'FREE' | 'NOT_FREE' | 'CONDITIONAL_FREE' | 'CHARGE_RECEIVED';
   deliveryCharge: number;
   freeShipOverAmount?: number;
+  deliveryChargeOnReturn?: number;     // 초도반품배송비
+  remoteAreaDeliverable?: 'Y' | 'N';   // 도서산간 배송
+  unionDeliveryType?: 'UNION_DELIVERY' | 'NOT_UNION_DELIVERY';  // 묶음배송
+
+  // 반품/교환 정보 (PDF 가이드 13페이지)
   returnCenterCode: string;
   returnCharge: number;
+  returnChargeVendor?: 'VENDOR' | 'BUYER';  // 반품비 청구
+
+  // A/S 정보 (PDF 가이드 13페이지)
+  afterServiceInformation?: string;
+  afterServiceContactNumber?: string;
+
+  // 출고지 및 판매자 정보 (PDF 가이드 9페이지)
+  outboundShippingPlaceCode?: string;
   vendorId: string;
+  vendorUserId?: string;  // 업체 담당자 ID
+
+  // 승인 요청 (PDF 가이드 27페이지)
+  requested?: boolean;  // false: 임시저장, true: 승인요청
+
+  // 기타
   items: CoupangProductItem[];
   requiredDocuments?: RequiredDocument[];
   extraInfoMessage?: string;
@@ -37,6 +63,7 @@ export interface CoupangProductItem {
   salePrice: number;
   maximumBuyCount: number;
   maximumBuyForPerson: number;
+  maximumBuyForPersonPeriod?: number;  // 구매 제한 기간 (일 단위) - PDF 가이드 14페이지
   outboundShippingTimeDay: number;
   unitCount: number;
   adultOnly: 'ADULT_ONLY' | 'EVERYONE';
@@ -46,6 +73,10 @@ export interface CoupangProductItem {
   pccNeeded: boolean;
   externalVendorSku: string;
   barcode?: string;
+  emptyBarcode?: boolean;              // 바코드 미등록 여부
+  emptyBarcodeReason?: string;         // 바코드 미등록 사유
+  modelNo?: string;                    // 모델번호
+  stockQuantity?: number;              // 재고 수량
   images: {
     imageOrder: number;
     imageType: 'REPRESENTATION' | 'DETAIL';
@@ -56,14 +87,19 @@ export interface CoupangProductItem {
     noticeCategoryDetailName: string;
     content: string;
   }[];
+  certifications?: {
+    certificationType: string;         // 인증 타입 (NOT_REQUIRED, KC, etc.)
+    certificationCode: string;         // 인증 번호
+  }[];
   attributes?: {
     attributeTypeName: string;
     attributeValueName: string;
   }[];
   contents?: {
-    contentsType: 'HTML' | 'IMAGE';
+    contentsType: 'HTML' | 'IMAGE' | 'TEXT';
     contentDetails: {
       content: string;
+      detailType?: string;
     }[];
   }[];
   offerCondition: 'NEW' | 'REFURBISHED';
@@ -95,10 +131,10 @@ export class CoupangWingClient {
   private vendorId: string;
   private baseUrl = 'https://api-gateway.coupang.com';
 
-  constructor(accessKey?: string, secretKey?: string, vendorId?: string) {
-    this.accessKey = accessKey || process.env.COUPANG_ACCESS_KEY || '';
-    this.secretKey = secretKey || process.env.COUPANG_SECRET_KEY || '';
-    this.vendorId = vendorId || process.env.COUPANG_VENDOR_ID || '';
+  constructor(accessKey: string, secretKey: string, vendorId: string) {
+    this.accessKey = accessKey;
+    this.secretKey = secretKey;
+    this.vendorId = vendorId;
   }
 
   /**
@@ -106,6 +142,13 @@ export class CoupangWingClient {
    */
   isConfigured(): boolean {
     return !!(this.accessKey && this.secretKey && this.vendorId);
+  }
+
+  /**
+   * VendorId getter
+   */
+  getVendorId(): string {
+    return this.vendorId;
   }
 
   /**
@@ -241,14 +284,63 @@ export class CoupangWingClient {
   }
 }
 
-// 싱글톤 인스턴스
-let wingClientInstance: CoupangWingClient | null = null;
+// DB에서 설정을 로드하여 Wing 클라이언트 생성
+export async function getCoupangWingClientFromDB(): Promise<CoupangWingClient | null> {
+  try {
+    const { getOrCreateDefaultUserId } = await import('@/lib/auth');
+    const { prisma } = await import('@/lib/prisma');
+    const userId = await getOrCreateDefaultUserId();
 
-export function getCoupangWingClient(): CoupangWingClient {
-  if (!wingClientInstance) {
-    wingClientInstance = new CoupangWingClient();
+    const config = await prisma.platformConfig.findUnique({
+      where: {
+        userId_platform: {
+          userId,
+          platform: 'COUPANG',
+        },
+      },
+    });
+
+    if (!config || !config.isActive) {
+      console.warn(`[CoupangWingClient] No active config for user ${userId}`);
+      return null;
+    }
+
+    const credentials = config.credentials as Record<string, string>;
+    const { accessKey, secretKey, vendorId } = credentials;
+
+    if (!accessKey || !secretKey || !vendorId) {
+      console.warn(`[CoupangWingClient] Missing credentials for user ${userId}`);
+      return null;
+    }
+
+    return new CoupangWingClient(accessKey, secretKey, vendorId);
+  } catch (error) {
+    console.error('[CoupangWingClient] Error loading from DB:', error);
+    return null;
   }
-  return wingClientInstance;
+}
+
+// 싱글톤 인스턴스 캐시
+const wingClientCache = new Map<string, CoupangWingClient>();
+
+export async function getCoupangWingClient(): Promise<CoupangWingClient> {
+  const { getOrCreateDefaultUserId } = await import('@/lib/auth');
+  const userId = await getOrCreateDefaultUserId();
+
+  // 캐시 확인
+  const cached = wingClientCache.get(userId);
+  if (cached) {
+    return cached;
+  }
+
+  // DB에서 설정 로드
+  const client = await getCoupangWingClientFromDB();
+  if (!client) {
+    throw new Error('쿠팡 API 설정이 없습니다. 설정 페이지에서 API 키를 입력해주세요.');
+  }
+
+  wingClientCache.set(userId, client);
+  return client;
 }
 
 /**

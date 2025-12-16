@@ -50,7 +50,7 @@ export async function POST(
     const { id } = await params;
     const body = await request.json();
 
-    const { platforms } = body; // ['COUPANG', 'NAVER', 'SHOP']
+    const { platforms, platformSettings } = body; // platforms: ['COUPANG', 'NAVER', 'SHOP'], platformSettings: { COUPANG: {...}, NAVER: {...}, SHOP: {...} }
 
     if (!platforms || platforms.length === 0) {
       return NextResponse.json(
@@ -128,7 +128,7 @@ export async function POST(
 
         switch (platform) {
           case 'COUPANG':
-            uploadResult = await uploadToCoupang(masterProduct as MasterProductData, config as unknown as PlatformConfigData);
+            uploadResult = await uploadToCoupang(masterProduct as MasterProductData, config as unknown as PlatformConfigData, userId, platformSettings?.COUPANG);
             break;
           case 'NAVER':
             uploadResult = await uploadToNaver(masterProduct as MasterProductData, config as unknown as PlatformConfigData);
@@ -264,18 +264,31 @@ interface CoupangDefaultSettings {
 }
 
 /**
- * 쿠팡 기본 설정 로드
+ * 쿠팡 기본 설정 로드 (DB에서 직접 조회)
  */
-async function loadCoupangSettings(): Promise<CoupangDefaultSettings | null> {
+async function loadCoupangSettings(userId: string): Promise<CoupangDefaultSettings | null> {
   try {
-    // 내부 API 호출 (서버 사이드)
-    const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
-    const response = await fetch(`${baseUrl}/api/coupang/settings`);
-    const result = await response.json();
+    // DB에서 직접 조회 (내부 API 호출 대신)
+    const platformConfig = await prisma.platformConfig.findFirst({
+      where: {
+        userId,
+        platform: 'COUPANG',
+      },
+    });
 
-    if (result.success && result.isConfigured) {
-      return result.data;
+    if (platformConfig) {
+      const credentials = platformConfig.credentials as Record<string, unknown> || {};
+      const settings = credentials.settings as CoupangDefaultSettings | undefined;
+
+      if (settings) {
+        return {
+          ...settings,
+          outboundShippingPlaceCode: platformConfig.outboundCode || settings.outboundShippingPlaceCode || '',
+          returnCenterCode: platformConfig.returnCode || settings.returnCenterCode || '',
+        };
+      }
     }
+
     return null;
   } catch (error) {
     console.error('쿠팡 설정 로드 실패:', error);
@@ -302,9 +315,18 @@ async function loadCoupangSettings(): Promise<CoupangDefaultSettings | null> {
  * - returnCenterCode: 반품센터 코드
  * - outboundShippingPlaceCode: 출고지 코드
  */
+// 플랫폼별 설정 타입
+interface CoupangPlatformSettings {
+  categoryCode?: string;
+  categoryName?: string;
+  notices?: Record<string, string>;
+}
+
 async function uploadToCoupang(
   masterProduct: MasterProductData,
-  config: PlatformConfigData
+  config: PlatformConfigData,
+  userId: string,
+  platformCoupangSettings?: CoupangPlatformSettings
 ): Promise<{ success: boolean; productId?: string; url?: string; message?: string }> {
   const credentials = config.credentials as Record<string, string>;
   const { vendorId, accessKey, secretKey } = credentials;
@@ -313,8 +335,8 @@ async function uploadToCoupang(
     return { success: false, message: '쿠팡 API 인증 정보가 없습니다.' };
   }
 
-  // 쿠팡 기본 설정 로드
-  const coupangSettings = await loadCoupangSettings();
+  // 쿠팡 기본 설정 로드 (DB에서 직접)
+  const coupangSettings = await loadCoupangSettings(userId);
 
   // 출고지/반품지: 기본설정 > PlatformConfig 순으로 확인
   const outboundCode = coupangSettings?.outboundShippingPlaceCode || config.outboundCode;
@@ -324,10 +346,10 @@ async function uploadToCoupang(
     return { success: false, message: '출고지/반품지 코드가 설정되지 않았습니다. 쿠팡 기본 설정을 확인해주세요.' };
   }
 
-  // 카테고리 코드 확인
-  const categoryCode = masterProduct.category?.coupangCategoryCode;
+  // 카테고리 코드 확인 (직접 선택한 카테고리 > 카테고리 매핑 > 오류)
+  const categoryCode = platformCoupangSettings?.categoryCode || masterProduct.category?.coupangCategoryCode;
   if (!categoryCode) {
-    return { success: false, message: '쿠팡 카테고리가 매핑되지 않았습니다. 카테고리 설정을 확인해주세요.' };
+    return { success: false, message: '쿠팡 카테고리가 설정되지 않았습니다. 쿠팡 탭에서 카테고리를 선택해주세요.' };
   }
 
   try {
@@ -343,8 +365,9 @@ async function uploadToCoupang(
       return { success: false, message: '상품 이미지가 필요합니다.' };
     }
 
-    // 상품고시정보 구성 (notices 필드에서 가져오거나 기본값 사용)
-    const productNotices = buildCoupangNotices(masterProduct.notices);
+    // 상품고시정보 구성 (platformSettings > masterProduct.notices > 기본값)
+    const noticesData = platformCoupangSettings?.notices || masterProduct.notices;
+    const productNotices = buildCoupangNotices(noticesData);
 
     // 옵션 처리
     const options = masterProduct.options as { name: string; values: string[] }[] || [];
@@ -771,6 +794,14 @@ async function uploadToShop(
     }
 
     // 자사몰 상품 = InventoryItem 생성
+    // 대표 이미지: thumbnailUrl 또는 첫 번째 이미지
+    const mainImage = masterProduct.thumbnailUrl || (images.length > 0 ? images[0] : undefined);
+
+    // 추가 이미지: thumbnailUrl이 있으면 images 전체, 없으면 images[1:]
+    const shopImages = masterProduct.thumbnailUrl
+      ? images
+      : images.slice(1);
+
     const inventoryItem = await prisma.inventoryItem.create({
       data: {
         userId,
@@ -783,7 +814,10 @@ async function uploadToShop(
         sellingPrice: masterProduct.basePrice,
         costPrice: masterProduct.costPrice,
         quantity: 100, // 기본 재고
-        imageUrl: masterProduct.thumbnailUrl || (images.length > 0 ? images[0] : undefined),
+        imageUrl: mainImage,
+        shopImages: shopImages, // 추가 이미지
+        shopDescription: masterProduct.detailHtml || undefined, // 상세페이지 HTML
+        isShopVisible: true, // 자사몰에 노출
         status: 'ACTIVE',
       },
     });

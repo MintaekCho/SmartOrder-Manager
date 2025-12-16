@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getOrCreateDefaultUserId } from '@/lib/auth';
-import { Platform } from '@prisma/client';
-import { CoupangApiClient } from '@/lib/coupang-api';
+import { createCoupangClient } from '@/lib/coupang/client';
 
 // 플랫폼 API 연결 테스트
 export async function POST(request: NextRequest) {
@@ -99,20 +98,40 @@ async function verifyCoupang(credentials: Record<string, string>): Promise<{
   }
 
   try {
-    // 쿠팡 API 클라이언트로 카테고리 목록 조회 (가벼운 API)
-    const client = new CoupangApiClient({
-      accessKey,
-      secretKey,
-      vendorId,
-    });
+    // 쿠팡 API 클라이언트로 출고지 목록 조회 (가벼운 API로 연결 확인)
+    const client = createCoupangClient({ accessKey, secretKey });
 
-    // 판매자 정보 조회 또는 카테고리 조회로 연결 확인
-    const categories = await client.getCategories();
+    // 출고지 조회로 연결 확인 (간단한 API)
+    const result = await client.getOutboundShippingPlaces(vendorId, 1, 10);
 
-    if (categories && Array.isArray(categories)) {
+    console.log('[Coupang Verify] API Response:', JSON.stringify(result, null, 2));
+
+    // 쿠팡 API 에러 응답 확인 (HTTP 200이지만 에러인 경우)
+    // 에러 응답 예시: { code: "ERROR", message: "Invalid signature" }
+    // 성공 응답: { code: 200, message: "SUCCESS" } 또는 content 배열만 있는 경우
+    const responseCode = (result as { code?: string | number }).code;
+    const responseCodeStr = String(responseCode).toUpperCase();
+
+    // 성공 코드 목록: "OK", "SUCCESS", "200", 숫자 200
+    const successCodes = ['OK', 'SUCCESS', '200'];
+    const isSuccessCode = !responseCode || successCodes.includes(responseCodeStr);
+
+    if (!isSuccessCode) {
+      const errorMessage = (result as { message?: string }).message || '알 수 없는 에러';
+      console.error('[Coupang Verify] API Error Response:', responseCode, errorMessage);
+      return {
+        success: false,
+        message: `쿠팡 API 오류: ${errorMessage} (${responseCode})`,
+        sellerInfo: null,
+      };
+    }
+
+    // 응답에 content가 배열로 있어야 성공
+    const content = result.content || result.data?.content;
+    if (Array.isArray(content)) {
       return {
         success: true,
-        message: '쿠팡 API 연결이 확인되었습니다.',
+        message: `쿠팡 API 연결이 확인되었습니다. (출고지 ${content.length}개)`,
         sellerInfo: {
           sellerId: vendorId,
           sellerName: `쿠팡 판매자 (${vendorId})`,
@@ -120,16 +139,37 @@ async function verifyCoupang(credentials: Record<string, string>): Promise<{
       };
     }
 
+    // content가 없으면 실패로 간주
+    console.error('[Coupang Verify] No content in response:', result);
     return {
       success: false,
-      message: 'API 응답을 받았으나 데이터가 올바르지 않습니다.',
+      message: 'API 응답에 출고지 정보가 없습니다. 자격 증명을 확인해주세요.',
       sellerInfo: null,
     };
   } catch (error) {
     console.error('쿠팡 API 검증 오류:', error);
+    // 에러 메시지에서 상태 코드 추출
+    const errorMessage = error instanceof Error ? error.message : 'API 연결에 실패했습니다.';
+
+    // 401 Unauthorized 등 인증 오류 명확히 표시
+    if (errorMessage.includes('401')) {
+      return {
+        success: false,
+        message: 'API 인증 실패: Access Key 또는 Secret Key가 올바르지 않습니다.',
+        sellerInfo: null,
+      };
+    }
+    if (errorMessage.includes('403')) {
+      return {
+        success: false,
+        message: 'API 권한 오류: 해당 Vendor ID에 대한 접근 권한이 없습니다.',
+        sellerInfo: null,
+      };
+    }
+
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'API 연결에 실패했습니다.',
+      message: errorMessage,
       sellerInfo: null,
     };
   }

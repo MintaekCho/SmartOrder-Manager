@@ -1,17 +1,21 @@
-import { getCoupangClient } from '../src/lib/coupang/client';
+import { createCoupangClient } from '../src/lib/coupang/client';
 
 async function testShipping() {
   const vendorId = process.env.COUPANG_VENDOR_ID;
+  const accessKey = process.env.COUPANG_ACCESS_KEY;
+  const secretKey = process.env.COUPANG_SECRET_KEY;
+
   console.log('VendorId:', vendorId);
-  console.log('AccessKey:', process.env.COUPANG_ACCESS_KEY ? '설정됨' : '없음');
-  console.log('SecretKey:', process.env.COUPANG_SECRET_KEY ? '설정됨' : '없음');
-  
-  if (!vendorId) {
-    console.error('COUPANG_VENDOR_ID가 설정되지 않았습니다.');
+  console.log('AccessKey:', accessKey ? '설정됨' : '없음');
+  console.log('SecretKey:', secretKey ? '설정됨' : '없음');
+
+  if (!vendorId || !accessKey || !secretKey) {
+    console.error('COUPANG_VENDOR_ID, COUPANG_ACCESS_KEY, COUPANG_SECRET_KEY가 모두 설정되어야 합니다.');
     return;
   }
 
-  const client = getCoupangClient();
+  // 테스트용으로 직접 클라이언트 생성 (환경변수 사용)
+  const client = createCoupangClient({ accessKey, secretKey });
 
   console.log('\n=== 출고지 조회 테스트 ===');
   try {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCoupangClient } from '@/lib/coupang/client';
+import { getCoupangClient, CoupangClient } from '@/lib/coupang/client';
 import { getNaverCommerceClient } from '@/lib/naver-api/client';
 
 // 쿠팡 카테고리 캐시 (메모리 캐시)
@@ -19,7 +19,7 @@ const CACHE_TTL = 1000 * 60 * 60; // 1시간
 /**
  * 쿠팡 카테고리 전체 목록 재귀 조회 (캐싱)
  */
-async function getAllCoupangCategories(client: ReturnType<typeof getCoupangClient>) {
+async function getAllCoupangCategories(client: CoupangClient) {
   // 캐시 확인
   if (coupangCategoryCache && Date.now() - coupangCategoryCache.timestamp < CACHE_TTL) {
     return coupangCategoryCache.data;
@@ -127,7 +127,7 @@ export async function GET(request: NextRequest) {
 
     // 쿠팡 카테고리
     if (platform === 'COUPANG') {
-      const client = getCoupangClient();
+      const client = await getCoupangClient();
 
       // 키워드 검색 또는 상품명 추천 (둘 다 로컬 검색으로 처리)
       const searchTerm = keyword || predict;

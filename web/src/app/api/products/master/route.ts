@@ -18,7 +18,8 @@ export async function GET(request: NextRequest) {
 
     const where = {
       userId,
-      ...(status && { status }),
+      // status가 명시적으로 지정되면 해당 상태만, 아니면 DELETED 제외
+      ...(status ? { status } : { status: { not: 'DELETED' as MasterProductStatus } }),
       ...(search && {
         OR: [
           { name: { contains: search, mode: 'insensitive' as const } },
@@ -95,6 +96,7 @@ export async function POST(request: NextRequest) {
       shippingFee,
       status,
       selectedPlatforms, // 등록할 플랫폼 목록 ['COUPANG', 'NAVER', 'SHOP']
+      platformSettings, // 플랫폼별 설정 { COUPANG: {...}, NAVER: {...}, SHOP: {...} }
     } = body;
 
     if (!name || !basePrice) {
@@ -119,6 +121,7 @@ export async function POST(request: NextRequest) {
         options: options || [],
         detailHtml,
         notices: notices || {},
+        platformSettings: platformSettings || {},
         shippingFee: parseInt(shippingFee) || 0,
         status: status || 'DRAFT',
       },

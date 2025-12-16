@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCoupangClient } from '@/lib/coupang/client';
+import { getCoupangClientWithVendorId } from '@/lib/coupang/client';
 
 // 상품 상세 조회
 export async function GET(
@@ -8,21 +8,12 @@ export async function GET(
 ) {
   try {
     const { sellerProductId } = await params;
-    const { searchParams } = new URL(request.url);
-    const vendorId = searchParams.get('vendorId') || process.env.COUPANG_VENDOR_ID;
-
-    if (!vendorId) {
-      return NextResponse.json(
-        { error: 'vendorId is required. Set COUPANG_VENDOR_ID in .env or pass as parameter.' },
-        { status: 400 }
-      );
-    }
 
     if (!sellerProductId) {
       return NextResponse.json({ error: 'sellerProductId is required' }, { status: 400 });
     }
 
-    const client = getCoupangClient();
+    const { client, vendorId } = await getCoupangClientWithVendorId();
     const response = await client.getProduct(vendorId, parseInt(sellerProductId));
 
     // seller-products API는 배열로 응답하므로 첫 번째 항목 추출

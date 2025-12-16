@@ -20,7 +20,17 @@
       "Bash(npx dotenv:*)",
       "Bash(node scripts/test-coupang-shipping.mjs:*)",
       "Bash(git add:*)",
-      "Bash(git commit -m \"$(cat <<''EOF''\nfeat: 쿠팡 Wing API 연동 및 멀티플랫폼 상품 등록 기능\n\n- 쿠팡 출고지/반품지 조회 API 추가 (marketplace_openapi v2)\n- 쿠팡 기본 설정 페이지 및 API 추가\n- 쿠팡 상품 등록 위자드 페이지 추가\n- 멀티플랫폼 상품 업로드 기능 추가\n- Card 컴포넌트 icon prop 추가\n- 카테고리 API 및 타입 개선\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")"
+      "Bash(git commit -m \"$(cat <<''EOF''\nfeat: 쿠팡 Wing API 연동 및 멀티플랫폼 상품 등록 기능\n\n- 쿠팡 출고지/반품지 조회 API 추가 (marketplace_openapi v2)\n- 쿠팡 기본 설정 페이지 및 API 추가\n- 쿠팡 상품 등록 위자드 페이지 추가\n- 멀티플랫폼 상품 업로드 기능 추가\n- Card 컴포넌트 icon prop 추가\n- 카테고리 API 및 타입 개선\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git push:*)",
+      "Bash(/opt/homebrew/bin/pnpm dev:*)",
+      "Bash(pnpm build:*)",
+      "Bash(/opt/homebrew/bin/pnpm build:*)",
+      "Bash(git checkout:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "WebSearch",
+      "WebFetch(domain:developers.coupangcorp.com)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nfeat: 상품 관리 시스템 개선\n\n- 상품 상세보기/수정 페이지 분리 (/products/[id], /products/[id]/edit)\n- 상품 등록/수정 페이지 UI 통합\n- 플랫폼별 마진 계산 기능 추가 (쿠팡 10.8%, 네이버 5.5%, 자사몰 0%)\n- 수수료율 직접 입력 기능 추가\n- 무료배송 시 마진 계산 버그 수정\n- DELETED 상태 상품 목록에서 제외\n- platformSettings DB 저장 기능 추가\n- 미사용 페이지 정리\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")"
     ],
     "deny": [],
     "ask": []

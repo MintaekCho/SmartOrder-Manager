@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCoupangClient } from '@/lib/coupang/client';
+import { getCoupangClientWithVendorId } from '@/lib/coupang/client';
 
 // 쿠팡 주문 상태를 대시보드 상태로 매핑
 function mapOrderStatus(status: string): 'pending' | 'processing' | 'completed' | 'error' {
@@ -21,17 +21,9 @@ function mapOrderStatus(status: string): 'pending' | 'processing' | 'completed' 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const vendorId = searchParams.get('vendorId') || process.env.COUPANG_VENDOR_ID;
     const limit = Math.min(parseInt(searchParams.get('limit') || '10'), 50);
 
-    if (!vendorId) {
-      return NextResponse.json(
-        { error: 'vendorId is required. Set COUPANG_VENDOR_ID in .env or pass as parameter.' },
-        { status: 400 }
-      );
-    }
-
-    const client = getCoupangClient();
+    const { client, vendorId } = await getCoupangClientWithVendorId();
 
     // 최근 7일간 주문 조회
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];

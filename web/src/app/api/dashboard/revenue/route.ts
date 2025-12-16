@@ -1,21 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCoupangClient } from '@/lib/coupang/client';
+import { getCoupangClientWithVendorId } from '@/lib/coupang/client';
 
 // 일별 매출 데이터 조회 API
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const vendorId = searchParams.get('vendorId') || process.env.COUPANG_VENDOR_ID;
     const days = parseInt(searchParams.get('days') || '7');
 
-    if (!vendorId) {
-      return NextResponse.json(
-        { error: 'vendorId is required. Set COUPANG_VENDOR_ID in .env or pass as parameter.' },
-        { status: 400 }
-      );
-    }
-
-    const client = getCoupangClient();
+    const { client, vendorId } = await getCoupangClientWithVendorId();
     const today = new Date();
     const revenueData: { date: string; revenue: number; profit: number }[] = [];
 

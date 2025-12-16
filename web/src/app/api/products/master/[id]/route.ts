@@ -84,6 +84,7 @@ export async function PUT(
       options,
       detailHtml,
       notices,
+      platformSettings,
       shippingFee,
       status,
     } = body;
@@ -102,6 +103,7 @@ export async function PUT(
         ...(options !== undefined && { options }),
         ...(detailHtml !== undefined && { detailHtml }),
         ...(notices !== undefined && { notices }),
+        ...(platformSettings !== undefined && { platformSettings }),
         ...(shippingFee !== undefined && { shippingFee: parseInt(shippingFee) || 0 }),
         ...(status !== undefined && { status }),
       },

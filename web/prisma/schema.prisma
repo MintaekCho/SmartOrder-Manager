@@ -1284,6 +1284,10 @@ model MasterProduct {
   // { "제조사": "...", "원산지": "...", "유통기한": "..." }
   notices         Json     @default("{}")
 
+  // 플랫폼별 설정 (JSON)
+  // { COUPANG: { categoryCode, categoryName, notices }, NAVER: { originAreaCode, originContent }, SHOP: { isVisible } }
+  platformSettings Json    @default("{}")
+
   // 배송 정보
   shippingFee     Int      @default(0)  // 배송비
   freeShipOver    Int?     // 무료배송 기준금액

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCoupangClient } from '@/lib/coupang/client';
+import { getCoupangClientWithVendorId } from '@/lib/coupang/client';
 
 /**
  * 쿠팡 출고지/반품지 조회 API
@@ -7,7 +7,6 @@ import { getCoupangClient } from '@/lib/coupang/client';
  * GET /api/coupang/shipping
  * - ?type=outbound : 출고지 목록 조회
  * - ?type=return : 반품지 목록 조회
- * - ?vendorId=xxx : 업체 ID (선택, 기본값: 환경변수)
  * - ?pageNum=1 : 페이지 번호 (선택, 기본값: 1)
  * - ?pageSize=50 : 페이지 크기 (선택, 기본값: 50)
  */
@@ -15,27 +14,23 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const type = searchParams.get('type') || 'outbound';
-    const vendorId = searchParams.get('vendorId') || process.env.COUPANG_VENDOR_ID;
     const pageNum = parseInt(searchParams.get('pageNum') || '1');
     const pageSize = parseInt(searchParams.get('pageSize') || '50');
 
-    if (!vendorId) {
-      return NextResponse.json(
-        { success: false, error: 'vendorId is required. Set COUPANG_VENDOR_ID in .env or pass as parameter.' },
-        { status: 400 }
-      );
-    }
-
-    const client = getCoupangClient();
+    const { client, vendorId } = await getCoupangClientWithVendorId();
 
     if (type === 'outbound') {
       // 출고지 목록 조회
       const response = await client.getOutboundShippingPlaces(vendorId, pageNum, pageSize);
 
+      // 새 API는 content를 직접 반환, 이전 API는 data.content로 반환
+      const outboundContent = response.data?.content || response.content || [];
+      const pagination = response.data?.pagination || response.pagination;
+
       return NextResponse.json({
         success: true,
         type: 'outbound',
-        data: response.data?.content?.map(place => ({
+        data: outboundContent.map(place => ({
           code: place.outboundShippingPlaceCode,
           name: place.shippingPlaceName,
           address: place.placeAddresses?.[0]?.returnAddress,
@@ -44,17 +39,21 @@ export async function GET(request: NextRequest) {
           contactNumber: place.placeAddresses?.[0]?.companyContactNumber,
           remoteAreaDeliverable: place.remoteAreaDeliverable,
           usable: place.usable,
-        })) || [],
-        pagination: response.data?.pagination,
+        })),
+        pagination,
       });
     } else if (type === 'return') {
       // 반품지 목록 조회
       const response = await client.getReturnShippingCenters(vendorId, pageNum, pageSize);
 
+      // 새 API는 content를 직접 반환, 이전 API는 data.content로 반환
+      const returnContent = response.data?.content || response.content || [];
+      const pagination = response.data?.pagination || response.pagination;
+
       return NextResponse.json({
         success: true,
         type: 'return',
-        data: response.data?.content?.map(center => ({
+        data: returnContent.map(center => ({
           code: center.returnCenterCode,
           name: center.shippingPlaceName,
           deliveryCompanyCode: center.deliverCode,
@@ -64,8 +63,8 @@ export async function GET(request: NextRequest) {
           zipCode: center.placeAddresses?.[0]?.returnZipCode,
           contactNumber: center.placeAddresses?.[0]?.companyContactNumber,
           usable: center.usable,
-        })) || [],
-        pagination: response.data?.pagination,
+        })),
+        pagination,
       });
     } else {
       return NextResponse.json(

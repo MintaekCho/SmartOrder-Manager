@@ -84,8 +84,10 @@ export interface PlatformConfig {
   credentials: Record<string, string>;
   sellerId?: string;
   sellerName?: string;
+  userId?: string;        // 업체 담당자 ID (쿠팡 필수)
   outboundCode?: string;  // 출고지 코드
   returnCode?: string;    // 반품지 코드
+  contactNumber?: string; // A/S 연락처 (쿠팡 필수)
 }
 
 // 카테고리 정보
@@ -102,7 +104,7 @@ export interface IPlatformAdapter {
   platform: Platform;
 
   // 설정 확인
-  isConfigured(): boolean;
+  isConfigured(): boolean | Promise<boolean>;
 
   // 상품 등록
   uploadProduct(
